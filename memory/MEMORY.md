@@ -1,0 +1,2 @@
+- [Project state](project_state.md) — Full workspace built; next steps are installing deps and downloading weights
+- [SSM research summary](ssm_research.md) — Mamba math, complexity, MambaGlue/MambaVO notes for the VO project
