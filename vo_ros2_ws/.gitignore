@@ -1,0 +1,28 @@
+# Model weights (large binary files — download separately)
+models/
+
+# Dataset (generated during data collection — not committed)
+data/images/
+data/groundtruth.txt
+
+# Results (generated during evaluation runs)
+results/latency_log.csv
+results/gpu_log.csv
+results/predicted_trajectory.txt
+results/evo_report/
+results/*.png
+results/*.pdf
+
+# Build artefacts
+build/
+install/
+log/
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store

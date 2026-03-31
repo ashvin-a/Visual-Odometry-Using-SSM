@@ -1,0 +1,24 @@
+# Core deep learning
+torch>=2.1.0
+torchvision>=0.16.0
+
+# SSM libraries (install via pip with --no-build-isolation after torch)
+# mamba-ssm
+# causal-conv1d
+
+# Vision / geometry
+opencv-python>=4.8.0
+numpy>=1.24.0
+scipy>=1.11.0
+kornia>=0.7.0
+
+# Trajectory evaluation
+evo>=1.29.0
+matplotlib>=3.7.0
+
+# GPU profiling
+nvidia-ml-py3>=12.535.0   # pynvml
+
+# ROS2 bridge (installed via apt, not pip)
+# ros-humble-cv-bridge
+# ros-humble-vision-opencv
