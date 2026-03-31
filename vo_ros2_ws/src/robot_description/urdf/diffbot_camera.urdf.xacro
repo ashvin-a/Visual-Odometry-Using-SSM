@@ -1,0 +1,225 @@
+<?xml version="1.0"?>
+<robot name="diffbot" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- ============================================================== -->
+  <!-- Parameters                                                       -->
+  <!-- ============================================================== -->
+  <xacro:property name="base_radius"  value="0.18"/>
+  <xacro:property name="base_height"  value="0.10"/>
+  <xacro:property name="wheel_radius" value="0.05"/>
+  <xacro:property name="wheel_width"  value="0.04"/>
+  <xacro:property name="wheel_sep"    value="0.22"/>
+  <xacro:property name="camera_w"     value="640"/>
+  <xacro:property name="camera_h"     value="480"/>
+  <xacro:property name="camera_fps"   value="30"/>
+
+  <!-- ============================================================== -->
+  <!-- Materials                                                        -->
+  <!-- ============================================================== -->
+  <material name="dark_grey">
+    <color rgba="0.2 0.2 0.2 1.0"/>
+  </material>
+  <material name="blue">
+    <color rgba="0.2 0.4 0.8 1.0"/>
+  </material>
+  <material name="black">
+    <color rgba="0.0 0.0 0.0 1.0"/>
+  </material>
+
+  <!-- ============================================================== -->
+  <!-- Base link (chassis)                                              -->
+  <!-- ============================================================== -->
+  <link name="base_footprint"/>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child  link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder radius="${base_radius}" length="${base_height}"/>
+      </geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="${base_radius}" length="${base_height}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="2.0"/>
+      <inertia ixx="0.0166" ixy="0" ixz="0"
+               iyy="0.0166" iyz="0"
+               izz="0.0320"/>
+    </inertial>
+  </link>
+
+  <!-- ============================================================== -->
+  <!-- Wheels (left and right)                                          -->
+  <!-- ============================================================== -->
+  <xacro:macro name="wheel" params="name y_reflect">
+    <link name="${name}_wheel_link">
+      <visual>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="black"/>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.3"/>
+        <inertia ixx="0.00037" ixy="0" ixz="0"
+                 iyy="0.00037" iyz="0"
+                 izz="0.00056"/>
+      </inertial>
+    </link>
+
+    <joint name="${name}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child  link="${name}_wheel_link"/>
+      <origin xyz="0 ${y_reflect * wheel_sep} 0" rpy="${-pi/2} 0 0"/>
+      <axis xyz="0 0 1"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel name="left"  y_reflect="1"/>
+  <xacro:wheel name="right" y_reflect="-1"/>
+
+  <!-- Caster (passive front wheel) -->
+  <link name="caster_link">
+    <visual>
+      <geometry><sphere radius="${wheel_radius * 0.5}"/></geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision>
+      <geometry><sphere radius="${wheel_radius * 0.5}"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0"
+               iyy="0.0001" iyz="0"
+               izz="0.0001"/>
+    </inertial>
+  </link>
+  <joint name="caster_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="caster_link"/>
+    <origin xyz="${base_radius - wheel_radius * 0.5} 0 ${-base_height/2 + wheel_radius * 0.5}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ============================================================== -->
+  <!-- Camera mount                                                     -->
+  <!-- ============================================================== -->
+  <link name="camera_link">
+    <visual>
+      <geometry><box size="0.04 0.08 0.03"/></geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <geometry><box size="0.04 0.08 0.03"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0"
+               iyy="0.00001" iyz="0"
+               izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="camera_link"/>
+    <!-- Front-centre of the chassis, elevated slightly -->
+    <origin xyz="${base_radius} 0 ${base_height/2 + 0.02}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Optical frame: ROS convention (Z forward, X right, Y down) -->
+  <link name="camera_optical_link"/>
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child  link="camera_optical_link"/>
+    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+  </joint>
+
+  <!-- ============================================================== -->
+  <!-- Gazebo plugins                                                   -->
+  <!-- ============================================================== -->
+
+  <!-- Differential drive controller -->
+  <gazebo>
+    <plugin name="diff_drive" filename="libgazebo_ros_diff_drive.so">
+      <ros>
+        <namespace>/</namespace>
+      </ros>
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      <wheel_separation>${wheel_sep * 2}</wheel_separation>
+      <wheel_diameter>${wheel_radius * 2}</wheel_diameter>
+      <max_wheel_torque>20</max_wheel_torque>
+      <max_wheel_acceleration>1.0</max_wheel_acceleration>
+      <command_topic>cmd_vel</command_topic>
+      <publish_odom>true</publish_odom>
+      <publish_odom_tf>true</publish_odom_tf>
+      <publish_wheel_tf>false</publish_wheel_tf>
+      <odometry_topic>odom</odometry_topic>
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+    </plugin>
+  </gazebo>
+
+  <!-- Monocular RGB camera — 640×480 @ 30 Hz -->
+  <gazebo reference="camera_link">
+    <sensor name="camera_sensor" type="camera">
+      <camera name="camera">
+        <horizontal_fov>1.3962634</horizontal_fov>  <!-- 80 degrees -->
+        <image>
+          <width>${camera_w}</width>
+          <height>${camera_h}</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.02</near>
+          <far>300</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+      <update_rate>${camera_fps}</update_rate>
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+        <ros>
+          <namespace>/</namespace>
+          <remapping>image_raw:=/camera/image_raw</remapping>
+          <remapping>camera_info:=/camera/camera_info</remapping>
+        </ros>
+        <frame_name>camera_optical_link</frame_name>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- Friction / physics for wheels -->
+  <gazebo reference="left_wheel_link">
+    <mu1>1.0</mu1>
+    <mu2>1.0</mu2>
+  </gazebo>
+  <gazebo reference="right_wheel_link">
+    <mu1>1.0</mu1>
+    <mu2>1.0</mu2>
+  </gazebo>
+  <gazebo reference="caster_link">
+    <mu1>0.01</mu1>
+    <mu2>0.01</mu2>
+  </gazebo>
+
+</robot>
