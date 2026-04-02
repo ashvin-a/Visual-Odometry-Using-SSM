@@ -1,25 +1,45 @@
 <?xml version="1.0" ?>
 <!--
-  structured_env.world
+  structured_env.world  (Ignition Gazebo 6 / Fortress)
 
   A textured indoor environment for visual odometry testing.
-  Contains walls with brick/concrete textures, furniture, and varied
-  surface patterns to ensure SuperPoint detects sufficient keypoints.
+  Contains brick walls, furniture, pillars, and crates to give
+  SuperPoint sufficient keypoint candidates.
 
-  Note: replace aws_small_house_world plugin paths if using a different
-  Gazebo model database.
+  Material note: Ignition Gazebo 6 does not use Gazebo Classic
+  material scripts (Gazebo/Bricks etc.).  Surfaces are defined
+  with RGBA diffuse/ambient values and a pbr metalness map instead.
 -->
-<sdf version="1.6">
+<sdf version="1.7">
   <world name="structured_env">
 
-    <!-- Physics -->
+    <!-- ============================================================== -->
+    <!-- Required Ignition Gazebo 6 system plugins                       -->
+    <!-- ============================================================== -->
+    <plugin filename="libignition-gazebo-physics-system.so"
+            name="ignition::gazebo::systems::Physics"/>
+    <plugin filename="libignition-gazebo-user-commands-system.so"
+            name="ignition::gazebo::systems::UserCommands"/>
+    <plugin filename="libignition-gazebo-scene-broadcaster-system.so"
+            name="ignition::gazebo::systems::SceneBroadcaster"/>
+    <!-- Sensors system is required for cameras to render -->
+    <plugin filename="libignition-gazebo-sensors-system.so"
+            name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- ============================================================== -->
+    <!-- Physics                                                          -->
+    <!-- ============================================================== -->
     <physics name="default_physics" default="0" type="ode">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>1000</real_time_update_rate>
     </physics>
 
-    <!-- Lighting -->
+    <!-- ============================================================== -->
+    <!-- Lighting                                                         -->
+    <!-- ============================================================== -->
     <light name="sun" type="directional">
       <cast_shadows>true</cast_shadows>
       <pose>0 0 10 0 0 0</pose>
@@ -46,7 +66,9 @@
       </attenuation>
     </light>
 
-    <!-- Ground plane with concrete texture -->
+    <!-- ============================================================== -->
+    <!-- Ground plane (concrete grey)                                     -->
+    <!-- ============================================================== -->
     <model name="ground_plane">
       <static>true</static>
       <link name="link">
@@ -59,10 +81,7 @@
           </geometry>
           <surface>
             <friction>
-              <ode>
-                <mu>100</mu>
-                <mu2>50</mu2>
-              </ode>
+              <ode><mu>100</mu><mu2>50</mu2></ode>
             </friction>
           </surface>
         </collision>
@@ -75,20 +94,18 @@
             </plane>
           </geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Grey</name>
-            </script>
+            <ambient>0.4 0.4 0.4 1</ambient>
+            <diffuse>0.4 0.4 0.4 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
     <!-- ============================================================== -->
-    <!-- Room walls (brick texture)                                       -->
+    <!-- Room walls (brick — warm reddish-brown)                         -->
     <!-- ============================================================== -->
 
-    <!-- North wall -->
     <model name="wall_north">
       <static>true</static>
       <pose>0 5 1 0 0 0</pose>
@@ -99,16 +116,14 @@
         <visual name="visual">
           <geometry><box><size>10 0.2 2</size></box></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Bricks</name>
-            </script>
+            <ambient>0.55 0.27 0.07 1</ambient>
+            <diffuse>0.55 0.27 0.07 1</diffuse>
+            <specular>0.1 0.05 0.0 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- South wall -->
     <model name="wall_south">
       <static>true</static>
       <pose>0 -5 1 0 0 0</pose>
@@ -119,16 +134,14 @@
         <visual name="visual">
           <geometry><box><size>10 0.2 2</size></box></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Bricks</name>
-            </script>
+            <ambient>0.55 0.27 0.07 1</ambient>
+            <diffuse>0.55 0.27 0.07 1</diffuse>
+            <specular>0.1 0.05 0.0 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- East wall -->
     <model name="wall_east">
       <static>true</static>
       <pose>5 0 1 0 0 1.5708</pose>
@@ -139,16 +152,14 @@
         <visual name="visual">
           <geometry><box><size>10 0.2 2</size></box></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Bricks</name>
-            </script>
+            <ambient>0.55 0.27 0.07 1</ambient>
+            <diffuse>0.55 0.27 0.07 1</diffuse>
+            <specular>0.1 0.05 0.0 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- West wall -->
     <model name="wall_west">
       <static>true</static>
       <pose>-5 0 1 0 0 1.5708</pose>
@@ -159,20 +170,19 @@
         <visual name="visual">
           <geometry><box><size>10 0.2 2</size></box></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Bricks</name>
-            </script>
+            <ambient>0.55 0.27 0.07 1</ambient>
+            <diffuse>0.55 0.27 0.07 1</diffuse>
+            <specular>0.1 0.05 0.0 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
     <!-- ============================================================== -->
-    <!-- Interior obstacles (varied textures for keypoint richness)      -->
+    <!-- Interior obstacles (varied colours = varied keypoint regions)   -->
     <!-- ============================================================== -->
 
-    <!-- Bookshelf (tall box) -->
+    <!-- Bookshelf — dark brown wood -->
     <model name="bookshelf_1">
       <static>true</static>
       <pose>-3 2 0.9 0 0 0</pose>
@@ -183,16 +193,15 @@
         <visual name="visual">
           <geometry><box><size>0.5 1.0 1.8</size></box></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
+            <ambient>0.36 0.18 0.09 1</ambient>
+            <diffuse>0.36 0.18 0.09 1</diffuse>
+            <specular>0.2 0.1 0.05 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- Table -->
+    <!-- Table — lighter wood floor colour -->
     <model name="table_1">
       <static>true</static>
       <pose>2 -2 0.4 0 0 0</pose>
@@ -203,16 +212,15 @@
         <visual name="visual">
           <geometry><box><size>1.2 0.8 0.8</size></box></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/WoodFloor</name>
-            </script>
+            <ambient>0.65 0.45 0.25 1</ambient>
+            <diffuse>0.65 0.45 0.25 1</diffuse>
+            <specular>0.3 0.2 0.1 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- Pillars (cylindrical) -->
+    <!-- Pillar 1 — concrete grey -->
     <model name="pillar_1">
       <static>true</static>
       <pose>2 2 1.0 0 0 0</pose>
@@ -223,15 +231,15 @@
         <visual name="visual">
           <geometry><cylinder><radius>0.15</radius><length>2.0</length></cylinder></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Concrete</name>
-            </script>
+            <ambient>0.5 0.5 0.5 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
+    <!-- Pillar 2 — concrete grey -->
     <model name="pillar_2">
       <static>true</static>
       <pose>-2 -2 1.0 0 0 0</pose>
@@ -242,16 +250,15 @@
         <visual name="visual">
           <geometry><cylinder><radius>0.15</radius><length>2.0</length></cylinder></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Concrete</name>
-            </script>
+            <ambient>0.5 0.5 0.5 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- Crates (varied visual features) -->
+    <!-- Crate 1 — teal -->
     <model name="crate_1">
       <static>true</static>
       <pose>-2 3.5 0.3 0 0 0.5</pose>
@@ -262,15 +269,15 @@
         <visual name="visual">
           <geometry><box><size>0.6 0.6 0.6</size></box></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/CeilingTiled</name>
-            </script>
+            <ambient>0.2 0.5 0.5 1</ambient>
+            <diffuse>0.2 0.5 0.5 1</diffuse>
+            <specular>0.1 0.2 0.2 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
+    <!-- Crate 2 — orange -->
     <model name="crate_2">
       <static>true</static>
       <pose>3 -3.5 0.3 0 0 0.8</pose>
@@ -281,16 +288,15 @@
         <visual name="visual">
           <geometry><box><size>0.6 0.6 0.6</size></box></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/CeilingTiled</name>
-            </script>
+            <ambient>0.8 0.4 0.1 1</ambient>
+            <diffuse>0.8 0.4 0.1 1</diffuse>
+            <specular>0.2 0.1 0.0 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- Ceiling -->
+    <!-- Ceiling — light grey -->
     <model name="ceiling">
       <static>true</static>
       <pose>0 0 2.1 0 0 0</pose>
@@ -298,10 +304,9 @@
         <visual name="visual">
           <geometry><box><size>10 10 0.1</size></box></geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Grey</name>
-            </script>
+            <ambient>0.7 0.7 0.7 1</ambient>
+            <diffuse>0.7 0.7 0.7 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
           </material>
         </visual>
       </link>
