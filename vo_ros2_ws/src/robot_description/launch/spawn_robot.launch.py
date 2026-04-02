@@ -89,7 +89,7 @@ def generate_launch_description():
             arguments=[
                 # Simulation clock (Ignition → ROS2) — needed for use_sim_time
                 '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
-                # Drive commands (ROS2 → Ignition) — for teleop
+                # Drive commands (ROS2 → Ignition)
                 '/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist',
                 # Ground-truth odometry (Ignition → ROS2) — for data collection
                 '/odom@nav_msgs/msg/Odometry[ignition.msgs.Odometry',
