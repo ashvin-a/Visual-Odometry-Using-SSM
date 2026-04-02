@@ -313,6 +313,278 @@
     </model>
 
     <!-- ============================================================== -->
+    <!-- Checkerboard floor tiles (5x5 grid, 2m x 2m each)              -->
+    <!-- Alternating dark/light grey — dense corner grid for SuperPoint  -->
+    <!-- ============================================================== -->
+
+    <model name="tile_0_0"><static>true</static><pose>-4 -4 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+    <model name="tile_1_0"><static>true</static><pose>-2 -4 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+    <model name="tile_2_0"><static>true</static><pose>0 -4 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+    <model name="tile_3_0"><static>true</static><pose>2 -4 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+    <model name="tile_4_0"><static>true</static><pose>4 -4 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+
+    <model name="tile_0_1"><static>true</static><pose>-4 -2 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+    <model name="tile_1_1"><static>true</static><pose>-2 -2 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+    <model name="tile_2_1"><static>true</static><pose>0 -2 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+    <model name="tile_3_1"><static>true</static><pose>2 -2 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+    <model name="tile_4_1"><static>true</static><pose>4 -2 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+
+    <model name="tile_0_2"><static>true</static><pose>-4 0 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+    <model name="tile_1_2"><static>true</static><pose>-2 0 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+    <model name="tile_2_2"><static>true</static><pose>0 0 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+    <model name="tile_3_2"><static>true</static><pose>2 0 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+    <model name="tile_4_2"><static>true</static><pose>4 0 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+
+    <model name="tile_0_3"><static>true</static><pose>-4 2 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+    <model name="tile_1_3"><static>true</static><pose>-2 2 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+    <model name="tile_2_3"><static>true</static><pose>0 2 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+    <model name="tile_3_3"><static>true</static><pose>2 2 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+    <model name="tile_4_3"><static>true</static><pose>4 2 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+
+    <model name="tile_0_4"><static>true</static><pose>-4 4 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+    <model name="tile_1_4"><static>true</static><pose>-2 4 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+    <model name="tile_2_4"><static>true</static><pose>0 4 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+    <model name="tile_3_4"><static>true</static><pose>2 4 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.75 0.75 0.75 1</ambient><diffuse>0.75 0.75 0.75 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link></model>
+    <model name="tile_4_4"><static>true</static><pose>4 4 0.005 0 0 0</pose><link name="link"><visual name="v"><geometry><box><size>1.96 1.96 0.01</size></box></geometry><material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.05 0.05 0.05 1</specular></material></visual></link></model>
+
+    <!-- ============================================================== -->
+    <!-- Wall panels — high-contrast rectangles at camera height         -->
+    <!-- Creates rectangular edges against the brick background          -->
+    <!-- ============================================================== -->
+
+    <!-- North wall panels (interior face at y ≈ 4.9) -->
+    <model name="panel_north_left">
+      <static>true</static>
+      <pose>-3 4.92 1.1 0 0 0</pose>
+      <link name="link">
+        <visual name="v">
+          <geometry><box><size>0.7 0.04 0.7</size></box></geometry>
+          <material>
+            <ambient>0.8 0.15 0.1 1</ambient>
+            <diffuse>0.8 0.15 0.1 1</diffuse>
+            <specular>0.3 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="panel_north_mid">
+      <static>true</static>
+      <pose>0 4.92 1.1 0 0 0</pose>
+      <link name="link">
+        <visual name="v">
+          <geometry><box><size>0.7 0.04 0.7</size></box></geometry>
+          <material>
+            <ambient>0.1 0.5 0.15 1</ambient>
+            <diffuse>0.1 0.5 0.15 1</diffuse>
+            <specular>0.1 0.3 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="panel_north_right">
+      <static>true</static>
+      <pose>3 4.92 1.1 0 0 0</pose>
+      <link name="link">
+        <visual name="v">
+          <geometry><box><size>0.7 0.04 0.7</size></box></geometry>
+          <material>
+            <ambient>0.1 0.2 0.8 1</ambient>
+            <diffuse>0.1 0.2 0.8 1</diffuse>
+            <specular>0.1 0.1 0.4 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- South wall panels (interior face at y ≈ -4.9) -->
+    <model name="panel_south_left">
+      <static>true</static>
+      <pose>-3 -4.92 1.1 0 0 0</pose>
+      <link name="link">
+        <visual name="v">
+          <geometry><box><size>0.7 0.04 0.7</size></box></geometry>
+          <material>
+            <ambient>0.85 0.65 0.05 1</ambient>
+            <diffuse>0.85 0.65 0.05 1</diffuse>
+            <specular>0.3 0.2 0.0 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="panel_south_mid">
+      <static>true</static>
+      <pose>0 -4.92 1.1 0 0 0</pose>
+      <link name="link">
+        <visual name="v">
+          <geometry><box><size>0.7 0.04 0.7</size></box></geometry>
+          <material>
+            <ambient>0.55 0.1 0.7 1</ambient>
+            <diffuse>0.55 0.1 0.7 1</diffuse>
+            <specular>0.2 0.05 0.3 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="panel_south_right">
+      <static>true</static>
+      <pose>3 -4.92 1.1 0 0 0</pose>
+      <link name="link">
+        <visual name="v">
+          <geometry><box><size>0.7 0.04 0.7</size></box></geometry>
+          <material>
+            <ambient>0.05 0.65 0.7 1</ambient>
+            <diffuse>0.05 0.65 0.7 1</diffuse>
+            <specular>0.0 0.2 0.3 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- East and west wall accent stripes (horizontal bands at two heights) -->
+    <model name="stripe_east_low">
+      <static>true</static>
+      <pose>4.92 0 0.5 0 0 0</pose>
+      <link name="link">
+        <visual name="v">
+          <geometry><box><size>0.04 8.0 0.15</size></box></geometry>
+          <material>
+            <ambient>0.7 0.55 0.3 1</ambient>
+            <diffuse>0.7 0.55 0.3 1</diffuse>
+            <specular>0.2 0.15 0.05 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="stripe_east_high">
+      <static>true</static>
+      <pose>4.92 0 1.5 0 0 0</pose>
+      <link name="link">
+        <visual name="v">
+          <geometry><box><size>0.04 8.0 0.15</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.5 1</ambient>
+            <diffuse>0.3 0.3 0.5 1</diffuse>
+            <specular>0.1 0.1 0.2 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="stripe_west_low">
+      <static>true</static>
+      <pose>-4.92 0 0.5 0 0 0</pose>
+      <link name="link">
+        <visual name="v">
+          <geometry><box><size>0.04 8.0 0.15</size></box></geometry>
+          <material>
+            <ambient>0.7 0.55 0.3 1</ambient>
+            <diffuse>0.7 0.55 0.3 1</diffuse>
+            <specular>0.2 0.15 0.05 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="stripe_west_high">
+      <static>true</static>
+      <pose>-4.92 0 1.5 0 0 0</pose>
+      <link name="link">
+        <visual name="v">
+          <geometry><box><size>0.04 8.0 0.15</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.5 1</ambient>
+            <diffuse>0.3 0.3 0.5 1</diffuse>
+            <specular>0.1 0.1 0.2 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ============================================================== -->
+    <!-- Additional objects — more corners at varied depths              -->
+    <!-- ============================================================== -->
+
+    <!-- Barrel — olive green cylinder -->
+    <model name="barrel_1">
+      <static>true</static>
+      <pose>-3 -2 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><cylinder><radius>0.15</radius><length>0.8</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.15</radius><length>0.8</length></cylinder></geometry>
+          <material>
+            <ambient>0.33 0.42 0.18 1</ambient>
+            <diffuse>0.33 0.42 0.18 1</diffuse>
+            <specular>0.1 0.15 0.05 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Book stack on the table (table top is at z=0.8) -->
+    <model name="book_stack">
+      <static>true</static>
+      <pose>2 -2 0.85 0 0 0.3</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.28 0.18 0.12</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.28 0.18 0.12</size></box></geometry>
+          <material>
+            <ambient>0.6 0.1 0.1 1</ambient>
+            <diffuse>0.6 0.1 0.1 1</diffuse>
+            <specular>0.2 0.05 0.05 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Stacked small crates near east wall -->
+    <model name="crate_stack_bottom">
+      <static>true</static>
+      <pose>3.5 3 0.3 0 0 0.4</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.6 0.6 0.6</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.6 0.6 0.6</size></box></geometry>
+          <material>
+            <ambient>0.5 0.25 0.5 1</ambient>
+            <diffuse>0.5 0.25 0.5 1</diffuse>
+            <specular>0.15 0.05 0.15 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="crate_stack_top">
+      <static>true</static>
+      <pose>3.5 3 0.9 0 0 0.9</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.5 0.5 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.5</size></box></geometry>
+          <material>
+            <ambient>0.9 0.6 0.05 1</ambient>
+            <diffuse>0.9 0.6 0.05 1</diffuse>
+            <specular>0.3 0.2 0.0 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ============================================================== -->
     <!-- GUI camera start position                                        -->
     <!-- ============================================================== -->
     <gui fullscreen="0">
