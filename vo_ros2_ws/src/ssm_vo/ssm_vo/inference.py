@@ -159,8 +159,7 @@ class SuperPoint:
 class MambaGlueMatcher:
     """Thin wrapper around the MambaGlue model from the glue-factory API."""
 
-    CONFIDENCE_THRESHOLD = 0.5
-    MIN_MATCHES = 20
+    MIN_MATCHES = 8  # minimum to attempt Essential Matrix (RANSAC needs 8)
 
     def __init__(self, weights_path: str, device: torch.device) -> None:
         self.device = device
@@ -214,7 +213,7 @@ class MambaGlueMatcher:
         matches = pred['matches0'][0].cpu().numpy()     # (N,)  index into kp1, -1 = unmatched
         scores  = pred['matching_scores0'][0].cpu().numpy()  # (N,) confidence
 
-        valid = (matches > -1) & (scores > self.CONFIDENCE_THRESHOLD)
+        valid = matches > -1  # model's internal filter_threshold=0.01 already handles confidence
         if valid.sum() < self.MIN_MATCHES:
             return None, None
 
@@ -250,7 +249,7 @@ class VOInference:
     ----------
     superpoint_weights : path to superpoint.pth
     mambaglue_weights  : path to mambaglue_checkpoint_best.tar
-    camera_matrix      : 3×3 float32 numpy array (K)
+    camera_matrix      : 3x3 float32 numpy array (K)
     device             : 'cuda' or 'cpu'
     """
 
