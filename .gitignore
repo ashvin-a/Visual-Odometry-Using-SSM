@@ -3,4 +3,4 @@
 project.txt
 install/
 build/
-checkpoint_best.tar
+__pycache__/
