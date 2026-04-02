@@ -253,9 +253,6 @@ class VOInference:
     device             : 'cuda' or 'cpu'
     """
 
-    IMAGE_W = 640
-    IMAGE_H = 480
-
     def __init__(
         self,
         superpoint_weights: str,
@@ -275,20 +272,16 @@ class VOInference:
         frame1: np.ndarray,
     ) -> np.ndarray | None:
         """
-        Compute the 4×4 relative pose T such that p1 ≈ T @ p0.
+        Compute the 4x4 relative pose T such that p1 ≈ T @ p0.
 
         Returns None if the frame pair is degenerate (too few matches or
         too few RANSAC inliers).
         """
         timer = _Timer()
 
-        kp0, desc0 = timer.measure('superpoint_ms', lambda: self.superpoint(frame0))
-        kp1, desc1 = timer.measure('superpoint_ms',  # overwrite — same stage
-                                   lambda: self.superpoint(frame1))
-        # Re-measure both SP calls combined
         t_sp = time.perf_counter()
-        kp0, desc0 = self.superpoint(frame0)
-        kp1, desc1 = self.superpoint(frame1)
+        kp0, desc0, size0 = self.superpoint(frame0)
+        kp1, desc1, size1 = self.superpoint(frame1)
         timer.elapsed['superpoint_ms'] = (time.perf_counter() - t_sp) * 1000
 
         if len(kp0) < 10 or len(kp1) < 10:
@@ -297,7 +290,7 @@ class VOInference:
         t_mg = time.perf_counter()
         pts0, pts1 = self.matcher.match(
             kp0, desc0, kp1, desc1,
-            image_size=(self.IMAGE_W, self.IMAGE_H),
+            image_size=size0,
         )
         timer.elapsed['mambaglue_ms'] = (time.perf_counter() - t_mg) * 1000
 
