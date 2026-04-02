@@ -1,7 +1,7 @@
 """
 inference.py — Standalone inference module (no ROS dependency).
 
-Takes two consecutive frames and returns a 4×4 relative pose matrix.
+Takes two consecutive frames and returns a 4x4 relative pose matrix.
 Uses SuperPoint for keypoint detection and MambaGlue for feature matching.
 """
 
@@ -100,7 +100,7 @@ class SuperPoint:
         """
         Parameters
         ----------
-        image_bgr : H×W×3 uint8 BGR image (OpenCV format)
+        image_bgr : HxWx3 uint8 BGR image (OpenCV format)
 
         Returns
         -------
@@ -318,7 +318,7 @@ def _recover_pose(
     ransac_threshold: float = 1.0,
 ) -> np.ndarray | None:
     """
-    Recover 4×4 pose from matched pixel pairs using the Essential Matrix.
+    Recover 4x4 pose from matched pixel pairs using the Essential Matrix.
 
     Returns None if fewer than 8 RANSAC inliers remain.
     """
@@ -337,7 +337,7 @@ def _recover_pose(
 
     _, R, t, _ = cv2.recoverPose(E, pts0[inliers], pts1[inliers], K)
 
-    # Assemble 4×4 homogeneous transform
+    # Assemble 4x4 homogeneous transform
     T = np.eye(4, dtype=np.float64)
     T[:3, :3] = R
     T[:3, 3] = t.ravel()
@@ -360,7 +360,7 @@ if __name__ == '__main__':
 
     sp_w, mg_w, img0_path, img1_path = sys.argv[1:5]
 
-    # Default Gazebo camera intrinsics (640×480, 80° FOV)
+    # Default Gazebo camera intrinsics (640x480, 80° FOV)
     fx = fy = 554.254
     cx, cy = 320.0, 240.0
     K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float32)
@@ -374,6 +374,6 @@ if __name__ == '__main__':
     if T is None:
         print("Degenerate frame pair — no valid pose returned.")
     else:
-        print("Relative pose T (4×4):")
+        print("Relative pose T (4x4):")
         print(T)
         print(f"\nTimings: {vo.timings}")

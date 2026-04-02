@@ -11,7 +11,7 @@ from scipy.spatial.transform import Rotation
 
 class TrajectoryAccumulator:
     """
-    Accumulates relative 4×4 poses into a world-frame trajectory.
+    Accumulates relative 4x4 poses into a world-frame trajectory.
 
     Usage
     -----
@@ -19,7 +19,7 @@ class TrajectoryAccumulator:
     for each frame:
         T_rel = inference.estimate_pose(prev, curr)  # may be None
         pose  = acc.update(T_rel)
-        # pose is always the best available world-frame pose (4×4)
+        # pose is always the best available world-frame pose (4x4)
     """
 
     def __init__(self) -> None:
@@ -31,11 +31,11 @@ class TrajectoryAccumulator:
         """
         Parameters
         ----------
-        T_rel : 4×4 relative pose, or None (degenerate frame)
+        T_rel : 4x4 relative pose, or None (degenerate frame)
 
         Returns
         -------
-        4×4 world-frame pose
+        4x4 world-frame pose
         """
         self.total_frames += 1
         if T_rel is None:
@@ -51,7 +51,7 @@ class TrajectoryAccumulator:
 
     @property
     def rotation_matrix(self) -> np.ndarray:
-        """Current 3×3 rotation matrix."""
+        """Current 3x3 rotation matrix."""
         return self._T_world[:3, :3]
 
     @property
