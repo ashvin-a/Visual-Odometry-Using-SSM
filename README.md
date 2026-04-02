@@ -75,7 +75,7 @@ MambaVO (CVPR 2025) is the natural target for this project — it is a complete,
 |---|---|
 | Language | Python 3.10+ |
 | Robot Framework | ROS2 Humble |
-| Simulation | Gazebo Harmonic |
+| Simulation | Gazebo Fortress |
 | SSM Feature Matcher | MambaGlue (ICRA 2025) |
 | Keypoint Detector | SuperPoint |
 | Pose Recovery | OpenCV (Essential Matrix + RANSAC) |
@@ -103,8 +103,7 @@ vo_ros2_ws/
 │   │   │   ├── pose_estimator.py      # Essential matrix, recoverPose, accumulation
 │   │   │   └── profiler.py            # FPS, latency, GPU utilization logging
 │   │   └── launch/
-│   │       ├── vo.launch.py           # Launches VO node
-│   │       └── collect.launch.py      # Launches data collection nodes
+│   │       └── vo.launch.py           # Launches VO node
 │   │
 │   ├── robot_description/             # Robot + world definition
 │   │   ├── urdf/
@@ -117,6 +116,8 @@ vo_ros2_ws/
 │   └── data_collector/                # Dataset recording package
 │       ├── package.xml
 │       ├── setup.py
+│       ├── launch/
+│       │   └── collect.launch.py      # Launches image_saver + gt_pose_saver
 │       └── data_collector/
 │           ├── image_saver_node.py    # /camera/image_raw → disk
 │           └── gt_pose_saver_node.py  # /odom → TUM format file
@@ -215,10 +216,9 @@ Goal: a robot drives around Gazebo and publishes `/camera/image_raw` and `/odom`
    - `libgazebo_ros_diff_drive` publishing `/odom` (ground truth odometry)
 
 2. Select or create a textured Gazebo world. **Do not use a blank world** — blank Gazebo environments have featureless walls with no texture gradient. SuperPoint will detect zero keypoints and the pipeline will produce no matches.
-   - Recommended: `aws_robomaker_small_house_world` or similar indoor textured world
    - Minimum requirement: varied surface textures, furniture, edges
 
-3. Write `spawn_robot.launch.py` to launch Gazebo with the world, spawn the robot, and bridge all required topics.
+3. Write `spawn_robot.launch.py` to launch Ignition Gazebo Fortress with the world, spawn the robot, and bridge all required topics.
 
 4. Verify:
    ```bash
@@ -451,7 +451,7 @@ ros2 launch robot_description spawn_robot.launch.py
 
 **Collect dataset:**
 ```bash
-ros2 launch ssm_vo collect.launch.py
+ros2 launch data_collector collect.launch.py
 # Teleoperate the robot for 2-3 minutes
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
