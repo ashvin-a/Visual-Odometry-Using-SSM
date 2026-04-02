@@ -80,11 +80,10 @@ class SuperPointNet(torch.nn.Module):
 class SuperPoint:
     """SuperPoint keypoint detector and descriptor extractor."""
 
-    TARGET_W = 640
-    TARGET_H = 480
+    TARGET_SIZE = 1024  # longest edge; matches MambaGlue's SuperPoint preprocess_conf
     NMS_RADIUS = 4
-    MAX_KEYPOINTS = 1024
-    KEYPOINT_THRESHOLD = 0.005
+    MAX_KEYPOINTS = 2048
+    KEYPOINT_THRESHOLD = 0.0005  # matches MambaGlue's SuperPoint default_conf
 
     def __init__(self, weights_path: str, device: torch.device) -> None:
         self.device = device
@@ -108,7 +107,10 @@ class SuperPoint:
         descriptors: (N, 256) float32 array
         """
         gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-        gray = cv2.resize(gray, (self.TARGET_W, self.TARGET_H))
+        h, w = gray.shape[:2]
+        scale = self.TARGET_SIZE / max(h, w)
+        proc_w, proc_h = int(round(w * scale)), int(round(h * scale))
+        gray = cv2.resize(gray, (proc_w, proc_h))
         inp = torch.from_numpy(gray.astype(np.float32) / 255.0).unsqueeze(0).unsqueeze(0)
         inp = inp.to(self.device)
 
@@ -133,13 +135,13 @@ class SuperPoint:
         keypoints = np.stack([ys, xs], axis=1).astype(np.float32)  # (N, 2) → (x, y)
 
         if len(keypoints) == 0:
-            return keypoints, np.zeros((0, 256), dtype=np.float32)
+            return keypoints, np.zeros((0, 256), dtype=np.float32), (proc_w, proc_h)
 
         # Sample descriptors at keypoint locations
         desc_np = desc_map[0].cpu().numpy()  # (256, H/8, W/8)
         kp_norm = keypoints.copy()
-        kp_norm[:, 0] = (kp_norm[:, 0] / (self.TARGET_W - 1)) * 2 - 1
-        kp_norm[:, 1] = (kp_norm[:, 1] / (self.TARGET_H - 1)) * 2 - 1
+        kp_norm[:, 0] = (kp_norm[:, 0] / (proc_w - 1)) * 2 - 1
+        kp_norm[:, 1] = (kp_norm[:, 1] / (proc_h - 1)) * 2 - 1
         kp_t = torch.from_numpy(kp_norm).unsqueeze(0).unsqueeze(0).to(self.device)  # (1,1,N,2)
         sampled = torch.nn.functional.grid_sample(
             desc_map, kp_t, align_corners=True
@@ -147,7 +149,7 @@ class SuperPoint:
         descriptors = sampled[0, :, 0, :].T.cpu().numpy()  # (N, 256)
         descriptors /= np.linalg.norm(descriptors, axis=1, keepdims=True) + 1e-8
 
-        return keypoints, descriptors
+        return keypoints, descriptors, (proc_w, proc_h)
 
 
 # --------------------------------------------------------------------------- #
