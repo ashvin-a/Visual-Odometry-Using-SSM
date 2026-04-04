@@ -8,9 +8,9 @@ plot and a 3D trajectory plot.
 Usage
 -----
 python scripts/visualize_trajectory.py \
-    --gt   data/groundtruth.txt \
-    --pred results/predicted_trajectory.txt \
-    --out  results/trajectory_plot.png
+    --gt   install/data/groundtruth.txt \
+    --pred ../results/predicted_trajectory.txt \
+    --out  ../results/trajectory_plot.png
 """
 
 import argparse
@@ -30,7 +30,7 @@ def load_tum(path: Path) -> tuple[np.ndarray, np.ndarray]:
     Returns
     -------
     timestamps : (N,) float64
-    poses      : (N, 7) float64  [tx ty tz qx qy qz qw]
+    poses      : (N, 3) float64  [tx ty tz]
     """
     rows = []
     with open(path) as fh:
@@ -46,19 +46,66 @@ def load_tum(path: Path) -> tuple[np.ndarray, np.ndarray]:
     return arr[:, 0], arr[:, 1:4]   # timestamps, (tx, ty, tz)
 
 
-def correct_scale(pred_xyz: np.ndarray, gt_xyz: np.ndarray) -> np.ndarray:
-    """Apply the best-fit scale factor to align pred onto gt (translation only)."""
-    s = (np.linalg.norm(gt_xyz) / np.linalg.norm(pred_xyz)) if np.linalg.norm(pred_xyz) > 0 else 1.0
-    return pred_xyz * s
+def align_by_timestamp(
+    ts_pred: np.ndarray, xyz_pred: np.ndarray,
+    ts_gt: np.ndarray,   xyz_gt: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    For each predicted timestamp find the nearest GT timestamp.
+    Returns (xyz_pred, xyz_gt_aligned) with one GT pose per pred pose.
+    """
+    idx = np.searchsorted(ts_gt, ts_pred)
+    idx = np.clip(idx, 0, len(ts_gt) - 1)
+    # Pick the closer of the two neighbours
+    idx_prev = np.clip(idx - 1, 0, len(ts_gt) - 1)
+    diff_next = np.abs(ts_gt[idx]      - ts_pred)
+    diff_prev = np.abs(ts_gt[idx_prev] - ts_pred)
+    idx = np.where(diff_prev < diff_next, idx_prev, idx)
+    return xyz_pred, xyz_gt[idx]
+
+
+def umeyama_alignment(
+    pred_xyz: np.ndarray,
+    gt_xyz: np.ndarray,
+    correct_scale: bool = True,
+) -> np.ndarray:
+    """
+    Align pred_xyz onto gt_xyz using the Umeyama algorithm (same as evo --align
+    --correct_scale).  Returns pred_xyz transformed by the optimal
+    rotation R, translation t, and (optionally) scale s:
+        aligned = s * (pred @ R.T) + t
+    """
+    n = pred_xyz.shape[0]
+    mu_pred = pred_xyz.mean(axis=0)
+    mu_gt   = gt_xyz.mean(axis=0)
+
+    pred_c = pred_xyz - mu_pred
+    gt_c   = gt_xyz   - mu_gt
+
+    var_pred = (pred_c ** 2).sum() / n
+
+    W = (gt_c.T @ pred_c) / n          # 3x3 cross-covariance
+    U, D, Vt = np.linalg.svd(W)
+
+    # Correct reflection
+    S = np.eye(3)
+    if np.linalg.det(U) * np.linalg.det(Vt) < 0:
+        S[2, 2] = -1
+
+    R = U @ S @ Vt
+    s = (D * S.diagonal()).sum() / var_pred if correct_scale and var_pred > 0 else 1.0
+    t = mu_gt - s * (R @ mu_pred)
+
+    return (s * (pred_xyz @ R.T)) + t
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description='Visualize predicted vs. ground-truth trajectory')
-    parser.add_argument('--gt',   required=True)
-    parser.add_argument('--pred', required=True)
-    parser.add_argument('--out',  default='results/trajectory_plot.png')
+    parser.add_argument('--gt',   default="install/data/groundtruth.txt")
+    parser.add_argument('--pred', default="../results/predicted_trajectory.txt")
+    parser.add_argument('--out',  default='../results/trajectory_plot.png')
     parser.add_argument('--correct_scale', action='store_true',
-                        help='Apply naive scale correction before plotting')
+                        help='Apply Umeyama SE3+scale alignment before plotting (matches evo --align --correct_scale)')
     args = parser.parse_args()
 
     gt_path   = Path(args.gt)
@@ -71,16 +118,14 @@ def main() -> None:
     if not pred_path.exists():
         print(f'Predicted trajectory not found: {pred_path}', file=sys.stderr); sys.exit(1)
 
-    _, gt_xyz   = load_tum(gt_path)
-    _, pred_xyz = load_tum(pred_path)
+    ts_gt,   gt_xyz   = load_tum(gt_path)
+    ts_pred, pred_xyz = load_tum(pred_path)
 
-    # Subsample to equal length
-    n = min(len(gt_xyz), len(pred_xyz))
-    gt_xyz   = gt_xyz[:n]
-    pred_xyz = pred_xyz[:n]
+    # Align GT to predicted timestamps so both cover the same time span.
+    pred_xyz, gt_xyz = align_by_timestamp(ts_pred, pred_xyz, ts_gt, gt_xyz)
 
-    if args.correct_scale:
-        pred_xyz = correct_scale(pred_xyz, gt_xyz)
+    # Always apply SE3 alignment (rotation + translation only, scale)
+    pred_xyz = umeyama_alignment(pred_xyz, gt_xyz, correct_scale=True)
 
     # ------------------------------------------------------------------ #
     # Plot
