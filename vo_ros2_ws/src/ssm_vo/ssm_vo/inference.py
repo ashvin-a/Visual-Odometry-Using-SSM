@@ -168,15 +168,11 @@ class MambaGlueMatcher:
 
     def _load(self, weights_path: str, device: torch.device):
         try:
-            from gluefactory.models.matchers.mambaglue import MambaGlue as _MG
-            model = _MG({'weights': weights_path})
-            model.to(device).eval()
-            return model
+            from mambaglue import MambaGlue as _MG
         except ImportError as exc:
             raise RuntimeError(
-                "MambaGlue (glue-factory) is not installed. "
-                "Run: git clone https://github.com/url-kaist/MambaGlue && "
-                "cd MambaGlue && pip install -e ."
+                "MambaGlue is not installed. "
+                "Activate the project venv and run: cd mamba_glue && pip install -e ."
             ) from exc
 
     @torch.no_grad()
@@ -201,13 +197,18 @@ class MambaGlueMatcher:
             return torch.from_numpy(arr).unsqueeze(0).to(self.device)
 
         W, H = image_size
+        size = torch.tensor([[W, H]], dtype=torch.float32, device=self.device)
         data = {
-            'keypoints0': _to_tensor(kp0),
-            'keypoints1': _to_tensor(kp1),
-            'descriptors0': _to_tensor(desc0),
-            'descriptors1': _to_tensor(desc1),
-            'image_size0': torch.tensor([[W, H]], dtype=torch.float32, device=self.device),
-            'image_size1': torch.tensor([[W, H]], dtype=torch.float32, device=self.device),
+            'image0': {
+                'keypoints': _to_tensor(kp0),
+                'descriptors': _to_tensor(desc0),
+                'image_size': size,
+            },
+            'image1': {
+                'keypoints': _to_tensor(kp1),
+                'descriptors': _to_tensor(desc1),
+                'image_size': size,
+            },
         }
         pred = self._model(data)
         matches = pred['matches0'][0].cpu().numpy()     # (N,)  index into kp1, -1 = unmatched
