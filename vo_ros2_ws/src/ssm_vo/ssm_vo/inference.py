@@ -124,8 +124,9 @@ class SuperPoint:
         kp_np = kp_np.reshape(H8, W8, 8, 8)
         kp_np = kp_np.transpose(0, 2, 1, 3).reshape(H8 * 8, W8 * 8)  # (H, W)
 
-        # NMS
-        xs, ys = np.where(kp_np > self.KEYPOINT_THRESHOLD)
+        # NMS — keep only local maxima, then threshold
+        nms_mask = _nms(kp_np, radius=self.NMS_RADIUS)
+        xs, ys = np.where(nms_mask & (kp_np > self.KEYPOINT_THRESHOLD))
         scores = kp_np[xs, ys]
         # Keep top-K
         if len(scores) > self.MAX_KEYPOINTS:
@@ -174,6 +175,33 @@ class MambaGlueMatcher:
                 "MambaGlue is not installed. "
                 "Activate the project venv and run: cd mamba_glue && pip install -e ."
             ) from exc
+
+        # Instantiate without auto-loading so we can supply the weights path.
+        model = _MG(features=None)
+        checkpoint = torch.load(weights_path, map_location='cpu')
+        state_dict = checkpoint.get('model', checkpoint)
+
+        # The checkpoint was trained with glue-factory where MambaGlue layers were
+        # named differently.  Remap to match the standalone mambaglue package:
+        #   matcher.*         → (strip prefix)
+        #   transformers.*    → transformermambas.*
+        #   mamba_self_attn.* → mamba_selfattn_mixer.*
+        # extractor.* keys are SuperPoint weights — skip them entirely.
+        remapped = {}
+        for k, v in state_dict.items():
+            if k.startswith('extractor.'):
+                continue
+            k = k.replace('matcher.', '')
+            k = k.replace('transformers.', 'transformermambas.')
+            k = k.replace('mamba_self_attn.', 'mamba_selfattn_mixer.')
+            remapped[k] = v
+
+        result = model.load_state_dict(remapped, strict=False)
+        if result.missing_keys:
+            print(f'[MambaGlue] {len(result.missing_keys)} missing keys after weight load '
+                  f'(first: {result.missing_keys[0]})')
+        model.to(device).eval()
+        return model
 
     @torch.no_grad()
     def match(
@@ -283,6 +311,15 @@ class VOInference:
         """
         timer = _Timer()
 
+        # Camera matrix scaled to match the resized image SuperPoint works on
+        orig_h, orig_w = frame0.shape[:2]
+        scale = self.superpoint.TARGET_SIZE / max(orig_h, orig_w)
+        K_proc = self.K.copy()
+        K_proc[0, 0] *= scale   # fx
+        K_proc[0, 2] *= scale   # cx
+        K_proc[1, 1] *= scale   # fy
+        K_proc[1, 2] *= scale   # cy
+
         t_sp = time.perf_counter()
         kp0, desc0, size0 = self.superpoint(frame0)
         kp1, desc1, size1 = self.superpoint(frame1)
@@ -302,7 +339,7 @@ class VOInference:
             return None
 
         t_geo = time.perf_counter()
-        pose = _recover_pose(pts0, pts1, self.K)
+        pose = _recover_pose(pts0, pts1, K_proc)
         timer.elapsed['geometry_ms'] = (time.perf_counter() - t_geo) * 1000
 
         self.timings = timer.elapsed
