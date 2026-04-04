@@ -261,6 +261,9 @@ class VOInference:
         device: str = 'cuda',
     ) -> None:
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
+        # cuDNN version mismatch workaround; CUDA kernels still run via cublas.
+        if self.device.type == 'cuda':
+            torch.backends.cudnn.enabled = False
         self.K = camera_matrix.astype(np.float64)
         self.superpoint = SuperPoint(superpoint_weights, self.device)
         self.matcher = MambaGlueMatcher(mambaglue_weights, self.device)
