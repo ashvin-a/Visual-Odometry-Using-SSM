@@ -8,8 +8,9 @@ table and saves the evo report.
 
 Usage
 -----
+## Make sure your in vo_ros2_ws directory before running
 python scripts/evaluate_ate.py \
-    --gt   data/groundtruth.txt \
+    --gt   install/data/groundtruth.txt \
     --pred results/predicted_trajectory.txt \
     --out  results/evo_report
 """
@@ -47,9 +48,9 @@ def run_evo(gt: Path, pred: Path, out: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description='ATE evaluation using evo')
-    parser.add_argument('--gt',   required=True, help='Ground-truth TUM file')
-    parser.add_argument('--pred', required=True, help='Predicted trajectory TUM file')
-    parser.add_argument('--out',  default='results/evo_report', help='Output directory')
+    parser.add_argument('--gt',   default="install/data/groundtruth.txt", help='Ground-truth TUM file')
+    parser.add_argument('--pred', default="../results/predicted_trajectory.txt", help='Predicted trajectory TUM file')
+    parser.add_argument('--out',  default='../results/evo_report', help='Output directory')
     args = parser.parse_args()
 
     gt   = Path(args.gt)
