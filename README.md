@@ -1,6 +1,6 @@
 # Real-Time Visual Odometry Using State Space Models
 
-A ROS2-based visual odometry pipeline using **MambaGlue** — an SSM (State Space Model) based feature matcher — combined with classical geometric pose estimation. The system runs inside a Gazebo simulation and is evaluated against ground truth using the `evo` trajectory evaluation tool.
+A ROS2-based visual odometry pipeline using **MambaGlue** — an SSM (State Space Model) based feature matcher — combined with classical geometric pose estimation. The system runs inside a Gazebo simulation and is evaluated against ground truth using the `evo` trajectory evaluation tool. [Link to Paper](https://docs.google.com/document/d/1OksWxSOJlJKUw4DwF5B7yOIgpqpqfljDETu-vJPCxZc/edit?tab=t.cf70makguuna)
 
 ---
 
