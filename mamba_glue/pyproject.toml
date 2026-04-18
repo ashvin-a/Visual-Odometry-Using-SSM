@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "mambaglue"
 description = "MambaGlue: Fast and Robust Local Feature Matching With Mamba"
