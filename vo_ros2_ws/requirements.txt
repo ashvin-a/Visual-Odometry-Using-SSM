@@ -1,11 +1,7 @@
+# Core deep learning
+torch>=2.1.0
+torchvision>=0.16.0
 
---extra-index-url https://download.pytorch.org/whl/cu124
-torch>=2.1.0,<2.12
-torchvision>=0.16
-kornia>=0.6.11
-omegaconf
-requests
-einops
 # SSM libraries (install via pip with --no-build-isolation after torch)
 # mamba-ssm
 # causal-conv1d
@@ -14,6 +10,7 @@ einops
 opencv-python>=4.8.0
 numpy>=1.24.0
 scipy>=1.11.0
+kornia>=0.7.0
 
 # Trajectory evaluation
 evo>=1.29.0
