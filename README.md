@@ -271,23 +271,31 @@ ros2 launch data_collector collect.launch.py
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
-**Run VO node (live):**
+**Run VO Node (live):**
 ```bash
+python scripts/run_offline.py
+
+# Running live
 ros2 launch ssm_vo vo.launch.py
+
 ```
 
-**Benchmark inference (standalone, no ROS):**
-```bash
-python scripts/benchmark_inference.py --data_dir data/images --n_pairs 500
-```
 
 **Evaluate ATE:**
 ```bash
 python scripts/evaluate_ate.py \
     --gt data/groundtruth.txt \
     --pred results/predicted_trajectory.txt
+
+# Visualize trajectory
+python scripts/visualize_trajectory.py 
 ```
 
+
+**Benchmark inference (standalone, no ROS):**
+```bash
+python scripts/benchmark_inference.py --data_dir data/images --n_pairs 500
+```
 ---
 
 ## Results
