@@ -23,7 +23,7 @@ def generate_launch_description():
     pkg_ros_gz    = get_package_share_directory('ros_gz_sim')
 
     urdf_file  = os.path.join(pkg_robot, 'urdf',   'diffbot_camera.urdf.xacro')
-    world_file = os.path.join(pkg_robot, 'worlds', 'structured_env.world')
+    world_file = os.path.join(pkg_robot, 'worlds', 'small_house.world')
 
     robot_description = ParameterValue(Command(['xacro ', urdf_file]), value_type=str)
 
@@ -69,7 +69,7 @@ def generate_launch_description():
                     arguments=[
                         '-name',  'diffbot',
                         '-topic', 'robot_description',
-                        '-x', '0', '-y', '0', '-z', '0.05',
+                        '-x', '-4', '-y', '0', '-z', '0.05',
                     ],
                     output='screen',
                 ),
