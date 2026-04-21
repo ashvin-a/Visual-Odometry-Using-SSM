@@ -233,24 +233,31 @@ APE w.r.t. translation part (m)
 ```bash
 # 1. Clone this repository
 git clone <repo-url>
-cd vo_ros2_ws
+cd Visual-Odometry-Using-SSM
 
-# 2. Install Python dependencies
-pip install -r requirements.txt
+# 2. Install PyTorch with CUDA 12.4
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
-# 3. Install Mamba SSM libraries
+# 3. Install Mamba SSM libraries (requires torch to be installed first)
 pip install mamba-ssm causal-conv1d --no-build-isolation
 
 # 4. Install MambaGlue
-git clone https://github.com/url-kaist/MambaGlue
-cd MambaGlue && pip install -e . && cd ..
+git clone https://github.com/url-kaist/MambaGlue mamba_glue
+cd mamba_glue && pip install -e . && cd ..
 
-# 5. Download pretrained weights into models/
+# 5. Install remaining Python dependencies
+pip install -r vo_ros2_ws/requirements.txt
+
+# 6. Install ROS2 bridge packages
+sudo apt install ros-humble-cv-bridge ros-humble-vision-opencv
+
+# 7. Download pretrained weights into models/
 #    - SuperPoint:  models/superpoint.pth
 #    - MambaGlue:   models/mambaglue_checkpoint_best.tar
 
-# 6. Build the ROS2 workspace
+# 8. Build the ROS2 workspace
 source /opt/ros/humble/setup.bash
+cd vo_ros2_ws
 colcon build --symlink-install
 source install/setup.bash
 ```
