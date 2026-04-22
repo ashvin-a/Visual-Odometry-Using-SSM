@@ -8,8 +8,9 @@ mamba-ssm>=2.3.0
 causal-conv1d>=1.6.0
 
 # Vision / geometry
-opencv-python>=4.9.0
-numpy>=2.0.0
+opencv-python>=4.10.0
+# Pinned below 2.0: ros-humble-cv-bridge (apt binary) was compiled against NumPy 1.x
+numpy>=1.24.0,<2.0
 scipy>=1.13.0
 kornia>=0.8.0
 
