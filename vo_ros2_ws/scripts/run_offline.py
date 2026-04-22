@@ -47,14 +47,20 @@ def parse_timestamp(path: Path) -> float:
 
 def run(args) -> None:
     image_dir = Path(args.data_dir)
-    frames = sorted(image_dir.glob('*.png'), key=lambda p: parse_timestamp(p))
+    all_frames = sorted(image_dir.glob('*.png'), key=lambda p: parse_timestamp(p))
+
+    # Filter to [start_ts, end_ts] window so offline runs match the GT range
+    frames = [f for f in all_frames
+              if args.start_ts <= parse_timestamp(f) <= args.end_ts]
 
     if len(frames) < 2:
-        print(f'Need at least 2 PNG images in {image_dir}, found {len(frames)}.',
+        print(f'Need at least 2 PNG images in {image_dir} within '
+              f'[{args.start_ts}, {args.end_ts}], found {len(frames)}.',
               file=sys.stderr)
         sys.exit(1)
 
-    print(f'Found {len(frames)} frames in {image_dir}')
+    print(f'Found {len(all_frames)} frames total, {len(frames)} in '
+          f'[{args.start_ts}, {args.end_ts}]')
 
     vo = VOInference(
         superpoint_weights=args.sp_weights,
@@ -84,6 +90,14 @@ def run(args) -> None:
                 T_world = acc.update(None)
                 line = acc.as_tum_line(ts)
                 fh.write(line + '\n')
+                prev_frame = frame
+                prev_ts = ts
+                continue
+
+            # Skip pairs with large timestamp gaps (different recording sessions)
+            if ts - prev_ts > args.max_dt:
+                print(f'  Warning: gap {ts - prev_ts:.3f}s at t={ts:.3f} — skipping pair',
+                      file=sys.stderr)
                 prev_frame = frame
                 prev_ts = ts
                 continue
@@ -140,6 +154,13 @@ def main() -> None:
                         help='Output TUM trajectory file path')
     parser.add_argument('--device',     default='cuda',
                         help='PyTorch device (cuda / cpu)')
+    parser.add_argument('--start_ts',   type=float, default=0.0,
+                        help='Only process frames with timestamp >= this value (seconds)')
+    parser.add_argument('--end_ts',     type=float, default=float('inf'),
+                        help='Only process frames with timestamp <= this value (seconds)')
+    parser.add_argument('--max_dt',     type=float, default=0.5,
+                        help='Skip frame pairs with timestamp gap > this value (seconds); '
+                             'catches cross-session boundaries in multi-session image dirs')
     args = parser.parse_args()
     run(args)
 
