@@ -81,11 +81,18 @@ class SuperPoint:
     """SuperPoint keypoint detector and descriptor extractor."""
 
     TARGET_SIZE = 1024  # longest edge; matches MambaGlue's SuperPoint preprocess_conf
-    NMS_RADIUS = 4
-    MAX_KEYPOINTS = 2048
-    KEYPOINT_THRESHOLD = 0.0005  # matches MambaGlue's SuperPoint default_conf
 
-    def __init__(self, weights_path: str, device: torch.device) -> None:
+    def __init__(
+        self,
+        weights_path: str,
+        device: torch.device,
+        nms_radius: int = 4,
+        max_keypoints: int = 2048,
+        keypoint_threshold: float = 0.0005,
+    ) -> None:
+        self.NMS_RADIUS = nms_radius
+        self.MAX_KEYPOINTS = max_keypoints
+        self.KEYPOINT_THRESHOLD = keypoint_threshold
         self.device = device
         self.net = SuperPointNet().to(device)
         ckpt = torch.load(weights_path, map_location=device)
@@ -160,9 +167,15 @@ class SuperPoint:
 class MambaGlueMatcher:
     """Thin wrapper around the MambaGlue model from the glue-factory API."""
 
-    MIN_MATCHES = 8  # minimum to attempt Essential Matrix (RANSAC needs 8)
-
-    def __init__(self, weights_path: str, device: torch.device) -> None:
+    def __init__(
+        self,
+        weights_path: str,
+        device: torch.device,
+        min_matches: int = 20,
+        confidence_threshold: float = 0.5,
+    ) -> None:
+        self.MIN_MATCHES = min_matches
+        self.confidence_threshold = confidence_threshold
         self.device = device
         self.weights_path = weights_path
         self._model = self._load(weights_path, device)
@@ -242,7 +255,7 @@ class MambaGlueMatcher:
         matches = pred['matches0'][0].cpu().numpy()     # (N,)  index into kp1, -1 = unmatched
         scores  = pred['matching_scores0'][0].cpu().numpy()  # (N,) confidence
 
-        valid = matches > -1  # model's internal filter_threshold=0.01 already handles confidence
+        valid = (matches > -1) & (scores > self.confidence_threshold)
         if valid.sum() < self.MIN_MATCHES:
             return None, None
 
@@ -288,14 +301,30 @@ class VOInference:
         mambaglue_weights: str,
         camera_matrix: np.ndarray,
         device: str = 'cuda',
+        nms_radius: int = 4,
+        max_keypoints: int = 2048,
+        keypoint_threshold: float = 0.0005,
+        min_matches: int = 20,
+        confidence_threshold: float = 0.5,
+        min_inliers: int = 8,
     ) -> None:
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
         # cuDNN version mismatch workaround; CUDA kernels still run via cublas.
         if self.device.type == 'cuda':
             torch.backends.cudnn.enabled = False
         self.K = camera_matrix.astype(np.float64)
-        self.superpoint = SuperPoint(superpoint_weights, self.device)
-        self.matcher = MambaGlueMatcher(mambaglue_weights, self.device)
+        self.min_inliers = min_inliers
+        self.superpoint = SuperPoint(
+            superpoint_weights, self.device,
+            nms_radius=nms_radius,
+            max_keypoints=max_keypoints,
+            keypoint_threshold=keypoint_threshold,
+        )
+        self.matcher = MambaGlueMatcher(
+            mambaglue_weights, self.device,
+            min_matches=min_matches,
+            confidence_threshold=confidence_threshold,
+        )
         self.timings: dict[str, float] = {}
 
     def estimate_pose(
@@ -339,7 +368,7 @@ class VOInference:
             return None
 
         t_geo = time.perf_counter()
-        pose = _recover_pose(pts0, pts1, K_proc)
+        pose = _recover_pose(pts0, pts1, K_proc, min_inliers=self.min_inliers)
         timer.elapsed['geometry_ms'] = (time.perf_counter() - t_geo) * 1000
 
         self.timings = timer.elapsed
@@ -350,12 +379,13 @@ def _recover_pose(
     pts0: np.ndarray,
     pts1: np.ndarray,
     K: np.ndarray,
-    ransac_threshold: float = 1.0,
+    ransac_threshold: float = 0.5,
+    min_inliers: int = 8,
 ) -> np.ndarray | None:
     """
     Recover 4x4 pose from matched pixel pairs using the Essential Matrix.
 
-    Returns None if fewer than 8 RANSAC inliers remain.
+    Returns None if fewer than min_inliers RANSAC inliers remain.
     """
     E, mask = cv2.findEssentialMat(
         pts0, pts1, K,
@@ -367,7 +397,7 @@ def _recover_pose(
         return None
 
     inliers = mask.ravel().astype(bool)
-    if inliers.sum() < 8:
+    if inliers.sum() < min_inliers:
         return None
 
     _, R, t, _ = cv2.recoverPose(E, pts0[inliers], pts1[inliers], K)

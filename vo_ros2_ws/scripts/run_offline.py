@@ -53,6 +53,14 @@ def run(args) -> None:
     frames = [f for f in all_frames
               if args.start_ts <= parse_timestamp(f) <= args.end_ts]
 
+    # Optionally thin the frame sequence (larger inter-frame baseline)
+    if args.frame_skip > 1:
+        frames = frames[::args.frame_skip]
+
+    # Optionally cap total frames processed
+    if args.max_frames > 0:
+        frames = frames[:args.max_frames]
+
     if len(frames) < 2:
         print(f'Need at least 2 PNG images in {image_dir} within '
               f'[{args.start_ts}, {args.end_ts}], found {len(frames)}.',
@@ -60,13 +68,21 @@ def run(args) -> None:
         sys.exit(1)
 
     print(f'Found {len(all_frames)} frames total, {len(frames)} in '
-          f'[{args.start_ts}, {args.end_ts}]')
+          f'[{args.start_ts}, {args.end_ts}]'
+          f'{f" (skip={args.frame_skip})" if args.frame_skip > 1 else ""}'
+          f'{f" (capped at {args.max_frames})" if args.max_frames > 0 else ""}')
 
     vo = VOInference(
         superpoint_weights=args.sp_weights,
         mambaglue_weights=args.mg_weights,
         camera_matrix=DEFAULT_K,
         device=args.device,
+        nms_radius=args.nms_radius,
+        max_keypoints=args.max_keypoints,
+        keypoint_threshold=args.kp_threshold,
+        min_matches=args.min_matches,
+        confidence_threshold=args.confidence,
+        min_inliers=args.min_inliers,
     )
     acc = TrajectoryAccumulator()
 
@@ -161,6 +177,25 @@ def main() -> None:
     parser.add_argument('--max_dt',     type=float, default=0.5,
                         help='Skip frame pairs with timestamp gap > this value (seconds); '
                              'catches cross-session boundaries in multi-session image dirs')
+    parser.add_argument('--frame_skip', type=int,   default=2,
+                        help='Process every Nth frame (e.g. 2 = every other frame, larger baseline)')
+    parser.add_argument('--max_frames', type=int,   default=0,
+                        help='Cap the number of frames processed (0 = no cap, process all)')
+    # SuperPoint hyperparameters
+    parser.add_argument('--nms_radius',   type=int,   default=4,
+                        help='SuperPoint NMS radius (larger = more spread keypoints)')
+    parser.add_argument('--max_keypoints', type=int,  default=2048,
+                        help='Maximum SuperPoint keypoints per frame')
+    parser.add_argument('--kp_threshold',  type=float, default=0.0005,
+                        help='SuperPoint keypoint score threshold')
+    # MambaGlue hyperparameters
+    parser.add_argument('--min_matches',  type=int,   default=20,
+                        help='Minimum high-confidence matches required (else frame is dropped)')
+    parser.add_argument('--confidence',   type=float, default=0.5,
+                        help='MambaGlue match confidence threshold [0, 1]')
+    # Geometry hyperparameters
+    parser.add_argument('--min_inliers',  type=int,   default=8,
+                        help='Minimum RANSAC inliers required after Essential Matrix estimation')
     args = parser.parse_args()
     run(args)
 
