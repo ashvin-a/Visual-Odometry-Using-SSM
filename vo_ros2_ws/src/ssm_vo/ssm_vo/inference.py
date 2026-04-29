@@ -1,7 +1,7 @@
 """
 inference.py — Standalone inference module (no ROS dependency).
 
-Takes two consecutive frames and returns a 4×4 relative pose matrix.
+Takes two consecutive frames and returns a 4x4 relative pose matrix.
 Uses SuperPoint for keypoint detection and MambaGlue for feature matching.
 """
 
@@ -80,13 +80,19 @@ class SuperPointNet(torch.nn.Module):
 class SuperPoint:
     """SuperPoint keypoint detector and descriptor extractor."""
 
-    TARGET_W = 640
-    TARGET_H = 480
-    NMS_RADIUS = 4
-    MAX_KEYPOINTS = 1024
-    KEYPOINT_THRESHOLD = 0.005
+    TARGET_SIZE = 1024  # longest edge; matches MambaGlue's SuperPoint preprocess_conf
 
-    def __init__(self, weights_path: str, device: torch.device) -> None:
+    def __init__(
+        self,
+        weights_path: str,
+        device: torch.device,
+        nms_radius: int = 4,
+        max_keypoints: int = 2048,
+        keypoint_threshold: float = 0.0005,
+    ) -> None:
+        self.NMS_RADIUS = nms_radius
+        self.MAX_KEYPOINTS = max_keypoints
+        self.KEYPOINT_THRESHOLD = keypoint_threshold
         self.device = device
         self.net = SuperPointNet().to(device)
         ckpt = torch.load(weights_path, map_location=device)
@@ -100,7 +106,7 @@ class SuperPoint:
         """
         Parameters
         ----------
-        image_bgr : H×W×3 uint8 BGR image (OpenCV format)
+        image_bgr : HxWx3 uint8 BGR image (OpenCV format)
 
         Returns
         -------
@@ -108,7 +114,10 @@ class SuperPoint:
         descriptors: (N, 256) float32 array
         """
         gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-        gray = cv2.resize(gray, (self.TARGET_W, self.TARGET_H))
+        h, w = gray.shape[:2]
+        scale = self.TARGET_SIZE / max(h, w)
+        proc_w, proc_h = int(round(w * scale)), int(round(h * scale))
+        gray = cv2.resize(gray, (proc_w, proc_h))
         inp = torch.from_numpy(gray.astype(np.float32) / 255.0).unsqueeze(0).unsqueeze(0)
         inp = inp.to(self.device)
 
@@ -122,8 +131,9 @@ class SuperPoint:
         kp_np = kp_np.reshape(H8, W8, 8, 8)
         kp_np = kp_np.transpose(0, 2, 1, 3).reshape(H8 * 8, W8 * 8)  # (H, W)
 
-        # NMS
-        xs, ys = np.where(kp_np > self.KEYPOINT_THRESHOLD)
+        # NMS — keep only local maxima, then threshold
+        nms_mask = _nms(kp_np, radius=self.NMS_RADIUS)
+        xs, ys = np.where(nms_mask & (kp_np > self.KEYPOINT_THRESHOLD))
         scores = kp_np[xs, ys]
         # Keep top-K
         if len(scores) > self.MAX_KEYPOINTS:
@@ -133,13 +143,13 @@ class SuperPoint:
         keypoints = np.stack([ys, xs], axis=1).astype(np.float32)  # (N, 2) → (x, y)
 
         if len(keypoints) == 0:
-            return keypoints, np.zeros((0, 256), dtype=np.float32)
+            return keypoints, np.zeros((0, 256), dtype=np.float32), (proc_w, proc_h)
 
         # Sample descriptors at keypoint locations
         desc_np = desc_map[0].cpu().numpy()  # (256, H/8, W/8)
         kp_norm = keypoints.copy()
-        kp_norm[:, 0] = (kp_norm[:, 0] / (self.TARGET_W - 1)) * 2 - 1
-        kp_norm[:, 1] = (kp_norm[:, 1] / (self.TARGET_H - 1)) * 2 - 1
+        kp_norm[:, 0] = (kp_norm[:, 0] / (proc_w - 1)) * 2 - 1
+        kp_norm[:, 1] = (kp_norm[:, 1] / (proc_h - 1)) * 2 - 1
         kp_t = torch.from_numpy(kp_norm).unsqueeze(0).unsqueeze(0).to(self.device)  # (1,1,N,2)
         sampled = torch.nn.functional.grid_sample(
             desc_map, kp_t, align_corners=True
@@ -147,7 +157,7 @@ class SuperPoint:
         descriptors = sampled[0, :, 0, :].T.cpu().numpy()  # (N, 256)
         descriptors /= np.linalg.norm(descriptors, axis=1, keepdims=True) + 1e-8
 
-        return keypoints, descriptors
+        return keypoints, descriptors, (proc_w, proc_h)
 
 
 # --------------------------------------------------------------------------- #
@@ -157,26 +167,54 @@ class SuperPoint:
 class MambaGlueMatcher:
     """Thin wrapper around the MambaGlue model from the glue-factory API."""
 
-    CONFIDENCE_THRESHOLD = 0.5
-    MIN_MATCHES = 20
-
-    def __init__(self, weights_path: str, device: torch.device) -> None:
+    def __init__(
+        self,
+        weights_path: str,
+        device: torch.device,
+        min_matches: int = 20,
+        confidence_threshold: float = 0.5,
+    ) -> None:
+        self.MIN_MATCHES = min_matches
+        self.confidence_threshold = confidence_threshold
         self.device = device
         self.weights_path = weights_path
         self._model = self._load(weights_path, device)
 
     def _load(self, weights_path: str, device: torch.device):
         try:
-            from gluefactory.models.matchers.mambaglue import MambaGlue as _MG
-            model = _MG({'weights': weights_path})
-            model.to(device).eval()
-            return model
+            from mambaglue import MambaGlue as _MG
         except ImportError as exc:
             raise RuntimeError(
-                "MambaGlue (glue-factory) is not installed. "
-                "Run: git clone https://github.com/url-kaist/MambaGlue && "
-                "cd MambaGlue && pip install -e ."
+                "MambaGlue is not installed. "
+                "Activate the project venv and run: cd mamba_glue && pip install -e ."
             ) from exc
+
+        # Instantiate without auto-loading so we can supply the weights path.
+        model = _MG(features=None)
+        checkpoint = torch.load(weights_path, map_location='cpu')
+        state_dict = checkpoint.get('model', checkpoint)
+
+        # The checkpoint was trained with glue-factory where MambaGlue layers were
+        # named differently.  Remap to match the standalone mambaglue package:
+        #   matcher.*         → (strip prefix)
+        #   transformers.*    → transformermambas.*
+        #   mamba_self_attn.* → mamba_selfattn_mixer.*
+        # extractor.* keys are SuperPoint weights — skip them entirely.
+        remapped = {}
+        for k, v in state_dict.items():
+            if k.startswith('extractor.'):
+                continue
+            k = k.replace('matcher.', '')
+            k = k.replace('transformers.', 'transformermambas.')
+            k = k.replace('mamba_self_attn.', 'mamba_selfattn_mixer.')
+            remapped[k] = v
+
+        result = model.load_state_dict(remapped, strict=False)
+        if result.missing_keys:
+            print(f'[MambaGlue] {len(result.missing_keys)} missing keys after weight load '
+                  f'(first: {result.missing_keys[0]})')
+        model.to(device).eval()
+        return model
 
     @torch.no_grad()
     def match(
@@ -200,19 +238,24 @@ class MambaGlueMatcher:
             return torch.from_numpy(arr).unsqueeze(0).to(self.device)
 
         W, H = image_size
+        size = torch.tensor([[W, H]], dtype=torch.float32, device=self.device)
         data = {
-            'keypoints0': _to_tensor(kp0),
-            'keypoints1': _to_tensor(kp1),
-            'descriptors0': _to_tensor(desc0),
-            'descriptors1': _to_tensor(desc1),
-            'image_size0': torch.tensor([[W, H]], dtype=torch.float32, device=self.device),
-            'image_size1': torch.tensor([[W, H]], dtype=torch.float32, device=self.device),
+            'image0': {
+                'keypoints': _to_tensor(kp0),
+                'descriptors': _to_tensor(desc0),
+                'image_size': size,
+            },
+            'image1': {
+                'keypoints': _to_tensor(kp1),
+                'descriptors': _to_tensor(desc1),
+                'image_size': size,
+            },
         }
         pred = self._model(data)
         matches = pred['matches0'][0].cpu().numpy()     # (N,)  index into kp1, -1 = unmatched
         scores  = pred['matching_scores0'][0].cpu().numpy()  # (N,) confidence
 
-        valid = (matches > -1) & (scores > self.CONFIDENCE_THRESHOLD)
+        valid = (matches > -1) & (scores > self.confidence_threshold)
         if valid.sum() < self.MIN_MATCHES:
             return None, None
 
@@ -248,12 +291,9 @@ class VOInference:
     ----------
     superpoint_weights : path to superpoint.pth
     mambaglue_weights  : path to mambaglue_checkpoint_best.tar
-    camera_matrix      : 3×3 float32 numpy array (K)
+    camera_matrix      : 3x3 float32 numpy array (K)
     device             : 'cuda' or 'cpu'
     """
-
-    IMAGE_W = 640
-    IMAGE_H = 480
 
     def __init__(
         self,
@@ -261,11 +301,30 @@ class VOInference:
         mambaglue_weights: str,
         camera_matrix: np.ndarray,
         device: str = 'cuda',
+        nms_radius: int = 4,
+        max_keypoints: int = 2048,
+        keypoint_threshold: float = 0.0005,
+        min_matches: int = 20,
+        confidence_threshold: float = 0.5,
+        min_inliers: int = 8,
     ) -> None:
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
+        # cuDNN version mismatch workaround; CUDA kernels still run via cublas.
+        if self.device.type == 'cuda':
+            torch.backends.cudnn.enabled = False
         self.K = camera_matrix.astype(np.float64)
-        self.superpoint = SuperPoint(superpoint_weights, self.device)
-        self.matcher = MambaGlueMatcher(mambaglue_weights, self.device)
+        self.min_inliers = min_inliers
+        self.superpoint = SuperPoint(
+            superpoint_weights, self.device,
+            nms_radius=nms_radius,
+            max_keypoints=max_keypoints,
+            keypoint_threshold=keypoint_threshold,
+        )
+        self.matcher = MambaGlueMatcher(
+            mambaglue_weights, self.device,
+            min_matches=min_matches,
+            confidence_threshold=confidence_threshold,
+        )
         self.timings: dict[str, float] = {}
 
     def estimate_pose(
@@ -274,20 +333,25 @@ class VOInference:
         frame1: np.ndarray,
     ) -> np.ndarray | None:
         """
-        Compute the 4×4 relative pose T such that p1 ≈ T @ p0.
+        Compute the 4x4 relative pose T such that p1 ≈ T @ p0.
 
         Returns None if the frame pair is degenerate (too few matches or
         too few RANSAC inliers).
         """
         timer = _Timer()
 
-        kp0, desc0 = timer.measure('superpoint_ms', lambda: self.superpoint(frame0))
-        kp1, desc1 = timer.measure('superpoint_ms',  # overwrite — same stage
-                                   lambda: self.superpoint(frame1))
-        # Re-measure both SP calls combined
+        # Camera matrix scaled to match the resized image SuperPoint works on
+        orig_h, orig_w = frame0.shape[:2]
+        scale = self.superpoint.TARGET_SIZE / max(orig_h, orig_w)
+        K_proc = self.K.copy()
+        K_proc[0, 0] *= scale   # fx
+        K_proc[0, 2] *= scale   # cx
+        K_proc[1, 1] *= scale   # fy
+        K_proc[1, 2] *= scale   # cy
+
         t_sp = time.perf_counter()
-        kp0, desc0 = self.superpoint(frame0)
-        kp1, desc1 = self.superpoint(frame1)
+        kp0, desc0, size0 = self.superpoint(frame0)
+        kp1, desc1, size1 = self.superpoint(frame1)
         timer.elapsed['superpoint_ms'] = (time.perf_counter() - t_sp) * 1000
 
         if len(kp0) < 10 or len(kp1) < 10:
@@ -296,7 +360,7 @@ class VOInference:
         t_mg = time.perf_counter()
         pts0, pts1 = self.matcher.match(
             kp0, desc0, kp1, desc1,
-            image_size=(self.IMAGE_W, self.IMAGE_H),
+            image_size=size0,
         )
         timer.elapsed['mambaglue_ms'] = (time.perf_counter() - t_mg) * 1000
 
@@ -304,7 +368,7 @@ class VOInference:
             return None
 
         t_geo = time.perf_counter()
-        pose = _recover_pose(pts0, pts1, self.K)
+        pose = _recover_pose(pts0, pts1, K_proc, min_inliers=self.min_inliers)
         timer.elapsed['geometry_ms'] = (time.perf_counter() - t_geo) * 1000
 
         self.timings = timer.elapsed
@@ -315,12 +379,13 @@ def _recover_pose(
     pts0: np.ndarray,
     pts1: np.ndarray,
     K: np.ndarray,
-    ransac_threshold: float = 1.0,
+    ransac_threshold: float = 0.5,
+    min_inliers: int = 8,
 ) -> np.ndarray | None:
     """
-    Recover 4×4 pose from matched pixel pairs using the Essential Matrix.
+    Recover 4x4 pose from matched pixel pairs using the Essential Matrix.
 
-    Returns None if fewer than 8 RANSAC inliers remain.
+    Returns None if fewer than min_inliers RANSAC inliers remain.
     """
     E, mask = cv2.findEssentialMat(
         pts0, pts1, K,
@@ -332,12 +397,12 @@ def _recover_pose(
         return None
 
     inliers = mask.ravel().astype(bool)
-    if inliers.sum() < 8:
+    if inliers.sum() < min_inliers:
         return None
 
     _, R, t, _ = cv2.recoverPose(E, pts0[inliers], pts1[inliers], K)
 
-    # Assemble 4×4 homogeneous transform
+    # Assemble 4x4 homogeneous transform
     T = np.eye(4, dtype=np.float64)
     T[:3, :3] = R
     T[:3, 3] = t.ravel()
@@ -360,7 +425,7 @@ if __name__ == '__main__':
 
     sp_w, mg_w, img0_path, img1_path = sys.argv[1:5]
 
-    # Default Gazebo camera intrinsics (640×480, 80° FOV)
+    # Default Gazebo camera intrinsics (640x480, 80° FOV)
     fx = fy = 554.254
     cx, cy = 320.0, 240.0
     K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float32)
@@ -374,6 +439,6 @@ if __name__ == '__main__':
     if T is None:
         print("Degenerate frame pair — no valid pose returned.")
     else:
-        print("Relative pose T (4×4):")
+        print("Relative pose T (4x4):")
         print(T)
         print(f"\nTimings: {vo.timings}")

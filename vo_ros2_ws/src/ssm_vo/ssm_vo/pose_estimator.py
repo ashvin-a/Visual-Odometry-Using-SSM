@@ -8,10 +8,39 @@ from the inference module.
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+# Rotation from camera optical frame to robot body frame.
+# cv2.recoverPose returns R,t in camera optical convention (Z=forward, X=right, Y=down).
+# Derived from URDF rpy=(-π/2, 0, -π/2): R = Rz(-π/2) @ Rx(-π/2).
+# Maps: Z_cam→X_robot, X_cam→-Y_robot, Y_cam→-Z_robot.
+# Without this transform, forward motion accumulates on the Z axis instead of X.
+_R_RC = np.array([
+    [ 0.,  0.,  1.],
+    [-1.,  0.,  0.],
+    [ 0., -1.,  0.],
+], dtype=np.float64)
+_T_RC = np.eye(4, dtype=np.float64)
+_T_RC[:3, :3] = _R_RC
+
+
+def _enforce_planar(T: np.ndarray) -> np.ndarray:
+    """Zero out Z translation and roll/pitch — keep only X, Y, yaw.
+
+    A differential-drive robot on flat ground has exactly 3 DoF. Any roll,
+    pitch, or Z translation in T_rel is measurement noise; accumulating it
+    compounds Z-drift over hundreds of frames.
+    """
+    T_out = T.copy()
+    T_out[2, 3] = 0.0
+    rpy = Rotation.from_matrix(T[:3, :3]).as_euler('xyz')
+    rpy[0] = 0.0  # zero roll
+    rpy[1] = 0.0  # zero pitch
+    T_out[:3, :3] = Rotation.from_euler('xyz', rpy).as_matrix()
+    return T_out
+
 
 class TrajectoryAccumulator:
     """
-    Accumulates relative 4×4 poses into a world-frame trajectory.
+    Accumulates relative 4x4 poses into a world-frame trajectory.
 
     Usage
     -----
@@ -19,7 +48,7 @@ class TrajectoryAccumulator:
     for each frame:
         T_rel = inference.estimate_pose(prev, curr)  # may be None
         pose  = acc.update(T_rel)
-        # pose is always the best available world-frame pose (4×4)
+        # pose is always the best available world-frame pose (4x4)
     """
 
     def __init__(self) -> None:
@@ -31,17 +60,20 @@ class TrajectoryAccumulator:
         """
         Parameters
         ----------
-        T_rel : 4×4 relative pose, or None (degenerate frame)
+        T_rel : 4x4 relative pose in camera optical frame, or None (degenerate)
 
         Returns
         -------
-        4×4 world-frame pose
+        4x4 world-frame pose
         """
         self.total_frames += 1
         if T_rel is None:
             self.dropped_frames += 1
         else:
-            self._T_world = self._T_world @ T_rel
+            # Re-express T_rel in robot body frame, then enforce planarity
+            T_rel_robot = _T_RC @ T_rel @ _T_RC.T
+            T_rel_robot = _enforce_planar(T_rel_robot)
+            self._T_world = self._T_world @ T_rel_robot
         return self._T_world.copy()
 
     @property
@@ -51,7 +83,7 @@ class TrajectoryAccumulator:
 
     @property
     def rotation_matrix(self) -> np.ndarray:
-        """Current 3×3 rotation matrix."""
+        """Current 3x3 rotation matrix."""
         return self._T_world[:3, :3]
 
     @property

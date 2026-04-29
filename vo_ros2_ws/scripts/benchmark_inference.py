@@ -65,6 +65,15 @@ def run(args) -> None:
         device=args.device,
     )
 
+    # Warmup: run a few pairs so CUDA kernels compile before measuring
+    WARMUP = min(5, len(pairs))
+    print(f'Warming up ({WARMUP} pairs)...')
+    for p0, p1 in pairs[:WARMUP]:
+        f0 = cv2.imread(str(p0))
+        f1 = cv2.imread(str(p1))
+        if f0 is not None and f1 is not None:
+            vo.estimate_pose(f0, f1)
+
     latencies   = []
     sp_times    = []
     mg_times    = []
@@ -144,11 +153,14 @@ def run(args) -> None:
     # Save CSV
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, 'w', newline='') as fh:
-        writer = csv.DictWriter(fh, fieldnames=log_rows[0].keys())
-        writer.writeheader()
-        writer.writerows(log_rows)
-    print(f'\nPer-frame log written to {out_path}')
+    if log_rows:
+        with open(out_path, 'w', newline='') as fh:
+            writer = csv.DictWriter(fh, fieldnames=log_rows[0].keys())
+            writer.writeheader()
+            writer.writerows(log_rows)
+        print(f'\nPer-frame log written to {out_path}')
+    else:
+        print('\nNo frames processed — CSV not written.')
 
 
 def main() -> None:
@@ -157,8 +169,8 @@ def main() -> None:
                         help='Directory of sorted PNG frames')
     parser.add_argument('--sp_weights', default='models/superpoint.pth',
                         help='Path to superpoint.pth')
-    parser.add_argument('--mg_weights', default='models/mambaglue_checkpoint_best.tar',
-                        help='Path to mambaglue_checkpoint_best.tar')
+    parser.add_argument('--mg_weights', default='models/checkpoint_best.tar',
+                        help='Path to mambaglue checkpoint_best.tar')
     parser.add_argument('--n_pairs',    type=int, default=500,
                         help='Number of consecutive frame pairs to evaluate')
     parser.add_argument('--device',     default='cuda',

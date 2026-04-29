@@ -29,8 +29,9 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
-from geometry_msgs.msg import Quaternion, Point, Pose, PoseWithCovariance, Twist, TwistWithCovariance
+from geometry_msgs.msg import Quaternion, Point, Pose, PoseWithCovariance, Twist, TwistWithCovariance, TransformStamped
 from cv_bridge import CvBridge
+from tf2_ros import TransformBroadcaster
 
 from .inference import VOInference
 from .pose_estimator import TrajectoryAccumulator
@@ -84,6 +85,7 @@ class VONode(Node):
         # --- Publishers ----------------------------------------------------- #
         self._pub_odom    = self.create_publisher(Odometry, '/vo/odometry', 10)
         self._pub_latency = self.create_publisher(Float64,  '/vo/latency',  10)
+        self._tf_broadcaster = TransformBroadcaster(self)
 
         # --- Subscriber ----------------------------------------------------- #
         self.create_subscription(Image, '/camera/image_raw', self._image_cb, 10)
@@ -141,15 +143,15 @@ class VONode(Node):
             )
 
     def _publish_odometry(self, T: np.ndarray, header) -> None:
-        msg = Odometry()
-        msg.header = header
-        msg.header.frame_id = 'odom'
-        msg.child_frame_id  = 'base_link'
-
         from scipy.spatial.transform import Rotation
         pos = T[:3, 3]
         q   = Rotation.from_matrix(T[:3, :3]).as_quat()  # (qx, qy, qz, qw)
 
+        # Odometry message
+        msg = Odometry()
+        msg.header = header
+        msg.header.frame_id = 'odom'
+        msg.child_frame_id  = 'base_link'
         msg.pose.pose.position.x = float(pos[0])
         msg.pose.pose.position.y = float(pos[1])
         msg.pose.pose.position.z = float(pos[2])
@@ -157,8 +159,21 @@ class VONode(Node):
         msg.pose.pose.orientation.y = float(q[1])
         msg.pose.pose.orientation.z = float(q[2])
         msg.pose.pose.orientation.w = float(q[3])
-
         self._pub_odom.publish(msg)
+
+        # TF broadcast (odom → base_link)
+        tf_msg = TransformStamped()
+        tf_msg.header = header
+        tf_msg.header.frame_id = 'odom'
+        tf_msg.child_frame_id  = 'base_link'
+        tf_msg.transform.translation.x = float(pos[0])
+        tf_msg.transform.translation.y = float(pos[1])
+        tf_msg.transform.translation.z = float(pos[2])
+        tf_msg.transform.rotation.x = float(q[0])
+        tf_msg.transform.rotation.y = float(q[1])
+        tf_msg.transform.rotation.z = float(q[2])
+        tf_msg.transform.rotation.w = float(q[3])
+        self._tf_broadcaster.sendTransform(tf_msg)
 
     # ---------------------------------------------------------------------- #
     # Cleanup
