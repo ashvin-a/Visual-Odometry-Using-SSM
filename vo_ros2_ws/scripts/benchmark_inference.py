@@ -28,6 +28,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src' / 'ssm_vo'))
 
 from ssm_vo.inference import VOInference
+from ssm_vo.profiler import HardwareProfiler
 
 
 # --------------------------------------------------------------------------- #
@@ -83,6 +84,9 @@ def run(args) -> None:
 
     print(f'Running benchmark on {len(pairs)} pairs (device: {args.device})...\n')
 
+    profiler = HardwareProfiler(log_path=Path(args.output).parent / 'gpu_log.csv')
+    profiler.start()
+
     for i, (p0, p1) in enumerate(pairs):
         f0 = cv2.imread(str(p0))
         f1 = cv2.imread(str(p1))
@@ -113,6 +117,9 @@ def run(args) -> None:
 
         if (i + 1) % 50 == 0:
             print(f'  [{i+1}/{len(pairs)}] last latency: {wall_ms:.1f} ms')
+
+    profiler.stop()
+    hw = profiler.summary()
 
     # ----------------------------------------------------------------------- #
     # Summary
@@ -148,6 +155,11 @@ def run(args) -> None:
     print(f'{"Geometry (ms)":<30} {geo["mean"]:>8.1f} {geo["std"]:>8.1f} {geo["p95"]:>8.1f}')
     print()
     print(f'{"End-to-end FPS":<30} {fps:>8.1f}')
+    print()
+    print(f'{"GPU util mean":<30} {hw["gpu_util_mean_%"]:>7.1f}%')
+    print(f'{"GPU util peak":<30} {hw["gpu_util_peak_%"]:>7.1f}%')
+    print(f'{"VRAM mean":<30} {hw["vram_mean_mb"]:>7.0f} MB')
+    print(f'{"VRAM peak":<30} {hw["vram_peak_mb"]:>7.0f} MB')
     print('=' * 60)
 
     # Save CSV
