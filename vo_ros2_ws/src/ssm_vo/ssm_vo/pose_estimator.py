@@ -8,6 +8,12 @@ from the inference module.
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+# Reject any T_rel whose rotation magnitude exceeds this threshold.
+# At 30 Hz with frame_skip=2 (~66 ms/frame), a ground robot cannot physically
+# rotate more than a few degrees per frame; 45° is a generous safety margin
+# that catches degenerate Essential Matrix solutions (near-180° flips, etc.).
+_MAX_ROTATION_DEG = 45.0
+
 # Rotation from camera optical frame to robot body frame.
 # cv2.recoverPose returns R,t in camera optical convention (Z=forward, X=right, Y=down).
 # Derived from URDF rpy=(-π/2, 0, -π/2): R = Rz(-π/2) @ Rx(-π/2).
@@ -70,10 +76,20 @@ class TrajectoryAccumulator:
         if T_rel is None:
             self.dropped_frames += 1
         else:
-            # Re-express T_rel in robot body frame, then enforce planarity
-            T_rel_robot = _T_RC @ T_rel @ _T_RC.T
-            T_rel_robot = _enforce_planar(T_rel_robot)
-            self._T_world = self._T_world @ T_rel_robot
+            # Sanity-check rotation magnitude before accumulating.
+            # cv2.recoverPose can return near-180° flips on degenerate frames;
+            # these pass the inlier count check but corrupt the trajectory.
+            rot_deg = np.degrees(Rotation.from_matrix(T_rel[:3, :3]).magnitude())
+            if rot_deg > _MAX_ROTATION_DEG:
+                self.dropped_frames += 1
+            else:
+                # Re-express T_rel in robot body frame, then enforce planarity
+                T_rel_robot = _T_RC @ T_rel @ _T_RC.T
+                T_rel_robot = _enforce_planar(T_rel_robot)
+                self._T_world = self._T_world @ T_rel_robot
+                # Clamp accumulated world pose to the plane as well; prevents
+                # floating-point roll/pitch creep from polluting future steps.
+                self._T_world = _enforce_planar(self._T_world)
         return self._T_world.copy()
 
     @property
