@@ -50,11 +50,14 @@ MambaVO (CVPR 2025) is the natural target for this project — it is a complete,
           │   Pose Estimator       │
           │  Essential Matrix      │  cv2.findEssentialMat (RANSAC)
           │  + cv2.recoverPose     │  → R, t (relative pose, up to scale)
+          │  + rotation gate       │  rejects |rot| > 45° as degenerate
+          │  + inlier ratio check  │  rejects < 15% inlier ratio
           └────────────┬───────────┘
                        │  4×4 homogeneous transform
                        ▼
           ┌────────────────────────┐
-          │  Trajectory Integrator │  Cumulative pose: T_world = T_world × T_rel
+          │  Trajectory Integrator │  T_world = T_world × T_rel_robot
+          │  + planarity clamp     │  zeros roll/pitch/Z each step
           └────────────┬───────────┘
                        │
                        ▼
@@ -114,36 +117,56 @@ ros2 launch robot_description spawn_robot.launch.py
 
 **Collect dataset:**
 ```bash
-ros2 launch data_collector collect.launch.py
-# Teleoperate the robot for 2-3 minutes
-ros2 run teleop_twist_keyboard teleop_twist_keyboard
+ros2 run data_collector image_saver       # Terminal 1: save images
+ros2 run data_collector gt_pose_saver     # Terminal 2: save ground truth poses
+ros2 run teleop_twist_keyboard teleop_twist_keyboard  # Terminal 3: drive robot
 ```
 
-**Run VO Node (live):**
+**Run offline VO on collected images:**
 ```bash
-python scripts/run_offline.py
+# Pure monocular (scale-corrected ATE evaluation)
+python vo_ros2_ws/scripts/run_offline.py \
+    --data_dir vo_ros2_ws/install/data/images \
+    --sp_weights models/superpoint.pth \
+    --mg_weights models/mambaglue_checkpoint_best.tar \
+    --output results/predicted_trajectory.txt
 
-# Running live
-ros2 launch ssm_vo vo.launch.py
-
+# GT-scale-assisted mode (restores metric scale from ground truth displacement)
+python vo_ros2_ws/scripts/run_offline.py \
+    --data_dir vo_ros2_ws/install/data/images \
+    --sp_weights models/superpoint.pth \
+    --mg_weights models/mambaglue_checkpoint_best.tar \
+    --gt_file vo_ros2_ws/install/data/groundtruth.txt \
+    --output results/predicted_trajectory.txt
 ```
 
+**Run VO node live (ROS2):**
+```bash
+ros2 launch ssm_vo vo.launch.py
+```
 
 **Evaluate ATE:**
 ```bash
-python scripts/evaluate_ate.py \
-    --gt data/groundtruth.txt \
+python vo_ros2_ws/scripts/evaluate_ate.py \
+    --gt vo_ros2_ws/install/data/groundtruth.txt \
     --pred results/predicted_trajectory.txt
-
-# Visualize trajectory
-python scripts/visualize_trajectory.py 
 ```
 
+**Visualize trajectory:**
+```bash
+python vo_ros2_ws/scripts/visualize_trajectory.py \
+    --gt vo_ros2_ws/install/data/groundtruth.txt \
+    --pred results/predicted_trajectory.txt
+```
 
 **Benchmark inference (standalone, no ROS):**
 ```bash
-python scripts/benchmark_inference.py --data_dir data/images --n_pairs 500
+python vo_ros2_ws/scripts/benchmark_inference.py \
+    --data_dir vo_ros2_ws/install/data/images \
+    --n_pairs 500 \
+    --device cuda
 ```
+
 ---
 
 ## Results
@@ -166,11 +189,16 @@ python scripts/benchmark_inference.py --data_dir data/images --n_pairs 500
 
 ## Known Limitations
 
-**Monocular scale ambiguity:** Monocular VO cannot recover metric scale from images alone. The ATE evaluation uses `--correct_scale` to find the best-fit scalar before computing error. All reported trajectory errors are scale-corrected. This is standard practice in monocular VO evaluation.
+**Monocular scale ambiguity:** `cv2.recoverPose` always returns a unit-norm translation vector — metric scale cannot be recovered from images alone. Two evaluation modes are supported:
+
+- *Pure monocular:* ATE evaluation uses `--correct_scale` (Umeyama SE3 + scale alignment). All reported errors are scale-corrected; this is standard practice in monocular VO.
+- *GT-scale-assisted:* Pass `--gt_file` to `run_offline.py` to scale each relative translation by the ground-truth inter-frame displacement. This isolates rotation accuracy from the scale problem and is clearly labelled in experiments.
 
 **Gazebo domain gap:** MambaGlue was trained on real-world outdoor image pairs (MegaDepth, HPatches). Gazebo's rendered textures are synthetic and Phong-shaded. Match quality may degrade in textureless regions of the simulation. A textured indoor world mitigates this but does not eliminate it.
 
-**Pure rotation degeneracy:** The Essential Matrix requires non-zero translation between frames. Pure rotation (robot spinning in place) makes the Essential Matrix ill-defined. The node holds the last valid pose in these cases.
+**Pure rotation degeneracy:** The Essential Matrix requires non-zero translation between frames. Pure rotation (robot spinning in place) makes the Essential Matrix ill-defined. The pipeline drops these frames and holds the last valid pose.
+
+**Degenerate Essential Matrix solutions:** On low-texture or near-planar scenes, `cv2.recoverPose` can return numerically valid but physically impossible solutions (e.g., near-180° rotations). Two guards are in place: an inlier ratio threshold (≥ 15% of matched points must be RANSAC inliers) and a rotation magnitude gate (< 45° per frame); frames that fail either check are dropped.
 
 ---
 

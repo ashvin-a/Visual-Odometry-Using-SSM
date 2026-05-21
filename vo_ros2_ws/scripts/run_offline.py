@@ -16,6 +16,7 @@ python scripts/run_offline.py \
 """
 
 import argparse
+import bisect
 import sys
 import time
 from pathlib import Path
@@ -27,6 +28,50 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src' / 'ssm_vo'))
 
 from ssm_vo.inference import VOInference
 from ssm_vo.pose_estimator import TrajectoryAccumulator
+
+
+def _load_gt(gt_file: Path):
+    """Load a TUM-format ground truth file → (timestamps list, positions dict)."""
+    timestamps = []
+    positions = {}
+    with open(gt_file) as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            ts = float(parts[0])
+            pos = np.array([float(parts[1]), float(parts[2]), float(parts[3])])
+            timestamps.append(ts)
+            positions[ts] = pos
+    timestamps.sort()
+    return timestamps, positions
+
+
+def _interp_position(timestamps, positions, ts: float):
+    """Linearly interpolate position at timestamp ts."""
+    if not timestamps:
+        return None
+    if ts <= timestamps[0]:
+        return positions[timestamps[0]]
+    if ts >= timestamps[-1]:
+        return positions[timestamps[-1]]
+    idx = bisect.bisect_left(timestamps, ts)
+    t0, t1 = timestamps[idx - 1], timestamps[idx]
+    alpha = (ts - t0) / (t1 - t0)
+    return positions[t0] + alpha * (positions[t1] - positions[t0])
+
+
+def _gt_scale(timestamps, positions, ts_prev: float, ts_curr: float) -> float:
+    """Return the GT displacement (metres) between two timestamps."""
+    p0 = _interp_position(timestamps, positions, ts_prev)
+    p1 = _interp_position(timestamps, positions, ts_curr)
+    if p0 is None or p1 is None:
+        return 1.0
+    dist = float(np.linalg.norm(p1 - p0))
+    return dist if dist > 1e-6 else 0.0  # 0.0 = stationary, don't move
 
 
 DEFAULT_K = np.array(
@@ -46,6 +91,17 @@ def parse_timestamp(path: Path) -> float:
 
 
 def run(args) -> None:
+    # Optional GT-scale assistance: load ground truth once up front.
+    gt_timestamps, gt_positions = None, None
+    if args.gt_file:
+        gt_path = Path(args.gt_file)
+        if not gt_path.exists():
+            print(f'Warning: --gt_file {gt_path} not found — running without scale correction.',
+                  file=sys.stderr)
+        else:
+            gt_timestamps, gt_positions = _load_gt(gt_path)
+            print(f'Loaded {len(gt_timestamps)} GT poses from {gt_path} (scale-assisted mode)')
+
     image_dir = Path(args.data_dir)
     all_frames = sorted(image_dir.glob('*.png'), key=lambda p: parse_timestamp(p))
 
@@ -122,6 +178,14 @@ def run(args) -> None:
             T_rel = vo.estimate_pose(prev_frame, frame)
             wall_ms = (time.perf_counter() - t0) * 1000
 
+            # Apply metric scale when GT is available.
+            # cv2.recoverPose always returns |t|=1 (unit-norm); multiplying by the
+            # GT inter-frame displacement restores metric scale without changing shape.
+            if T_rel is not None and gt_timestamps is not None:
+                scale = _gt_scale(gt_timestamps, gt_positions, prev_ts, ts)
+                T_rel = T_rel.copy()
+                T_rel[:3, 3] *= scale
+
             T_world = acc.update(T_rel)
             line = acc.as_tum_line(ts)
             fh.write(line + '\n')
@@ -170,6 +234,9 @@ def main() -> None:
                         help='Output TUM trajectory file path')
     parser.add_argument('--device',     default='cuda',
                         help='PyTorch device (cuda / cpu)')
+    parser.add_argument('--gt_file',    default=None,
+                        help='TUM ground-truth file for metric scale recovery '
+                             '(GT-scale-assisted mode; omit for pure monocular VO)')
     parser.add_argument('--start_ts',   type=float, default=0.0,
                         help='Only process frames with timestamp >= this value (seconds)')
     parser.add_argument('--end_ts',     type=float, default=float('inf'),
