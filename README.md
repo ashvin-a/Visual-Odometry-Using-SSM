@@ -177,9 +177,15 @@ python vo_ros2_ws/scripts/run_offline.py \
 python vo_ros2_ws/scripts/run_offline.py \
     --data_dir vo_ros2_ws/data/images \
     --sp_weights models/superpoint.pth \
+<<<<<<< HEAD
     --mg_weights models/checkpoint_best.tar \
     --gt_file vo_ros2_ws/data/groundtruth.txt \
     --output results/predicted_trajectory_gt.txt
+=======
+    --mg_weights models/mambaglue_checkpoint_best.tar \
+    --gt_file vo_ros2_ws/install/data/groundtruth.txt \
+    --output results/predicted_trajectory.txt
+>>>>>>> f609785 (Update README.)
 ```
 
 **Run VO node live (ROS2):**
