@@ -111,6 +111,13 @@ source /opt/ros/humble/setup.bash
 cd vo_ros2_ws
 colcon build --symlink-install
 source install/setup.bash
+
+# --- Optional: SuperGlue baseline ---
+# SuperGlue is not on PyPI; clone the repo and download weights manually.
+git clone https://github.com/magicleap/SuperGluePretrainedNetwork superglue
+# Weights are included in the repo under superglue/models/weights/
+#   superglue_outdoor.pth  (use for open-space Gazebo environments)
+#   superglue_indoor.pth
 ```
 
 ---
@@ -141,7 +148,7 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 python vo_ros2_ws/scripts/run_offline.py \
     --data_dir vo_ros2_ws/data/images \
     --sp_weights models/superpoint.pth \
-    --mg_weights models/checkpoint_best.tar \
+    --mg_weights models/mambaglue_checkpoint_best.tar \
     --matcher mambaglue \
     --output results/traj_mambaglue.txt
 
