@@ -26,7 +26,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src' / 'ssm_vo'))
 
-from ssm_vo.inference import VOInference
+from ssm_vo.inference import VOInference, MambaGlueMatcher
+from ssm_vo.matchers import SuperGlueMatcher, LightGlueMatcher
 from ssm_vo.pose_estimator import TrajectoryAccumulator
 
 
@@ -128,6 +129,31 @@ def run(args) -> None:
           f'{f" (skip={args.frame_skip})" if args.frame_skip > 1 else ""}'
           f'{f" (capped at {args.max_frames})" if args.max_frames > 0 else ""}')
 
+    import torch
+    _device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+
+    if args.matcher == 'superglue':
+        matcher = SuperGlueMatcher(
+            weights=args.sg_weights,
+            device=_device,
+            repo_path=args.sg_repo,
+            min_matches=args.min_matches,
+            confidence_threshold=args.confidence,
+        )
+        print(f'Matcher: SuperGlue (weights={args.sg_weights})')
+    elif args.matcher == 'lightglue':
+        matcher = LightGlueMatcher(
+            device=_device,
+            min_matches=args.min_matches,
+            confidence_threshold=args.confidence,
+            adaptive=args.lg_adaptive,
+        )
+        mode = 'adaptive' if args.lg_adaptive else 'full-depth'
+        print(f'Matcher: LightGlue ({mode})')
+    else:
+        matcher = None  # VOInference builds MambaGlueMatcher internally
+        print(f'Matcher: MambaGlue (weights={args.mg_weights})')
+
     vo = VOInference(
         superpoint_weights=args.sp_weights,
         mambaglue_weights=args.mg_weights,
@@ -139,6 +165,7 @@ def run(args) -> None:
         min_matches=args.min_matches,
         confidence_threshold=args.confidence,
         min_inliers=args.min_inliers,
+        matcher=matcher,
     )
     acc = TrajectoryAccumulator()
 
@@ -237,6 +264,19 @@ def main() -> None:
     parser.add_argument('--gt_file',    default=None,
                         help='TUM ground-truth file for metric scale recovery '
                              '(GT-scale-assisted mode; omit for pure monocular VO)')
+    # Matcher selection
+    parser.add_argument('--matcher',    default='mambaglue',
+                        choices=['mambaglue', 'superglue', 'lightglue'],
+                        help='Feature matcher backend (default: mambaglue)')
+    parser.add_argument('--sg_weights', default='outdoor',
+                        help='SuperGlue weights: "indoor", "outdoor", or path to .pth '
+                             '(only used when --matcher=superglue)')
+    parser.add_argument('--sg_repo',    default='superglue',
+                        help='Path to cloned SuperGluePretrainedNetwork repo '
+                             '(only used when --matcher=superglue)')
+    parser.add_argument('--lg_adaptive', action='store_true',
+                        help='Enable LightGlue adaptive depth/width pruning '
+                             '(faster but variable; default: full-depth for fair comparison)')
     parser.add_argument('--start_ts',   type=float, default=0.0,
                         help='Only process frames with timestamp >= this value (seconds)')
     parser.add_argument('--end_ts',     type=float, default=float('inf'),

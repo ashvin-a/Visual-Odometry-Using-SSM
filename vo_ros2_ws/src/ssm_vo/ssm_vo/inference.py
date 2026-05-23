@@ -143,7 +143,10 @@ class SuperPoint:
         keypoints = np.stack([ys, xs], axis=1).astype(np.float32)  # (N, 2) → (x, y)
 
         if len(keypoints) == 0:
-            return keypoints, np.zeros((0, 256), dtype=np.float32), (proc_w, proc_h)
+            return (keypoints,
+                    np.zeros(0, dtype=np.float32),
+                    np.zeros((0, 256), dtype=np.float32),
+                    (proc_w, proc_h))
 
         # Sample descriptors at keypoint locations
         desc_np = desc_map[0].cpu().numpy()  # (256, H/8, W/8)
@@ -157,7 +160,7 @@ class SuperPoint:
         descriptors = sampled[0, :, 0, :].T.cpu().numpy()  # (N, 256)
         descriptors /= np.linalg.norm(descriptors, axis=1, keepdims=True) + 1e-8
 
-        return keypoints, descriptors, (proc_w, proc_h)
+        return keypoints, scores.astype(np.float32), descriptors, (proc_w, proc_h)
 
 
 # --------------------------------------------------------------------------- #
@@ -219,14 +222,15 @@ class MambaGlueMatcher:
     @torch.no_grad()
     def match(
         self,
-        kp0: np.ndarray, desc0: np.ndarray,
-        kp1: np.ndarray, desc1: np.ndarray,
+        kp0: np.ndarray, sc0: np.ndarray, desc0: np.ndarray,
+        kp1: np.ndarray, sc1: np.ndarray, desc1: np.ndarray,
         image_size: tuple,
     ):
         """
         Parameters
         ----------
         kp0, kp1     : (N, 2) float32 (x, y) keypoints
+        sc0, sc1     : (N,) float32 keypoint scores (unused by MambaGlue)
         desc0, desc1 : (N, 256) float32 descriptors
         image_size   : (W, H) of the images
 
@@ -290,9 +294,13 @@ class VOInference:
     Parameters
     ----------
     superpoint_weights : path to superpoint.pth
-    mambaglue_weights  : path to mambaglue_checkpoint_best.tar
+    mambaglue_weights  : path to mambaglue_checkpoint_best.tar (used only when
+                         matcher is None, i.e. the default MambaGlue backend)
     camera_matrix      : 3x3 float32 numpy array (K)
     device             : 'cuda' or 'cpu'
+    matcher            : pre-constructed matcher object (MambaGlueMatcher,
+                         SuperGlueMatcher, or LightGlueMatcher); when supplied,
+                         mambaglue_weights is ignored
     """
 
     def __init__(
@@ -307,6 +315,7 @@ class VOInference:
         min_matches: int = 20,
         confidence_threshold: float = 0.5,
         min_inliers: int = 8,
+        matcher=None,
     ) -> None:
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
         # cuDNN version mismatch workaround; CUDA kernels still run via cublas.
@@ -320,11 +329,14 @@ class VOInference:
             max_keypoints=max_keypoints,
             keypoint_threshold=keypoint_threshold,
         )
-        self.matcher = MambaGlueMatcher(
-            mambaglue_weights, self.device,
-            min_matches=min_matches,
-            confidence_threshold=confidence_threshold,
-        )
+        if matcher is not None:
+            self.matcher = matcher
+        else:
+            self.matcher = MambaGlueMatcher(
+                mambaglue_weights, self.device,
+                min_matches=min_matches,
+                confidence_threshold=confidence_threshold,
+            )
         self.timings: dict[str, float] = {}
 
     def estimate_pose(
@@ -350,8 +362,8 @@ class VOInference:
         K_proc[1, 2] *= scale   # cy
 
         t_sp = time.perf_counter()
-        kp0, desc0, size0 = self.superpoint(frame0)
-        kp1, desc1, size1 = self.superpoint(frame1)
+        kp0, sc0, desc0, size0 = self.superpoint(frame0)
+        kp1, sc1, desc1, size1 = self.superpoint(frame1)
         timer.elapsed['superpoint_ms'] = (time.perf_counter() - t_sp) * 1000
 
         if len(kp0) < 10 or len(kp1) < 10:
@@ -359,10 +371,10 @@ class VOInference:
 
         t_mg = time.perf_counter()
         pts0, pts1 = self.matcher.match(
-            kp0, desc0, kp1, desc1,
+            kp0, sc0, desc0, kp1, sc1, desc1,
             image_size=size0,
         )
-        timer.elapsed['mambaglue_ms'] = (time.perf_counter() - t_mg) * 1000
+        timer.elapsed['matcher_ms'] = (time.perf_counter() - t_mg) * 1000
 
         if pts0 is None:
             return None
