@@ -169,11 +169,11 @@ python vo_ros2_ws/scripts/run_offline.py \
 
 # GT-scale-assisted mode — add --gt_file to any of the above
 python vo_ros2_ws/scripts/run_offline.py \
-    --data_dir vo_ros2_ws/install/data/images \
+    --data_dir vo_ros2_ws/data/images \
     --sp_weights models/superpoint.pth \
     --mg_weights models/mambaglue_checkpoint_best.tar \
     --gt_file vo_ros2_ws/install/data/groundtruth.txt \
-    --output results/traj_mambaglue_gt_scale.txt
+    --output results/predicted_trajectory.txt
 ```
 
 **Run VO node live (ROS2):**
@@ -184,8 +184,8 @@ ros2 launch ssm_vo vo.launch.py
 **Evaluate ATE:**
 ```bash
 python vo_ros2_ws/scripts/evaluate_ate.py \
-    --gt vo_ros2_ws/install/data/groundtruth.txt \
-    --pred results/predicted_trajectory.txt
+    --gt vo_ros2_ws/data/groundtruth.txt \
+    --pred results/predicted_trajectory.txt # or results/predicted_trajectory_gt.txt
 ```
 
 **Visualize trajectory:**
