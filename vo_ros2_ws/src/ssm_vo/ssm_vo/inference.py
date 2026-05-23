@@ -397,7 +397,13 @@ def _recover_pose(
         return None
 
     inliers = mask.ravel().astype(bool)
-    if inliers.sum() < min_inliers:
+    n_inliers = inliers.sum()
+    if n_inliers < min_inliers:
+        return None
+
+    # Low inlier ratio means the matched points are mostly outliers — the
+    # Essential Matrix will be unreliable even if the raw count passes.
+    if n_inliers / len(pts0) < 0.15:
         return None
 
     _, R, t, _ = cv2.recoverPose(E, pts0[inliers], pts1[inliers], K)
