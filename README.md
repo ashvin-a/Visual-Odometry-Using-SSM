@@ -104,20 +104,13 @@ sudo apt install ros-humble-cv-bridge ros-humble-vision-opencv
 
 # 7. Download pretrained weights into models/
 #    - SuperPoint:  models/superpoint.pth
-#    - MambaGlue:   models/mambaglue_checkpoint_best.tar
+#    - MambaGlue:   models/checkpoint_best.tar
 
 # 8. Build the ROS2 workspace
 source /opt/ros/humble/setup.bash
 cd vo_ros2_ws
 colcon build --symlink-install
 source install/setup.bash
-
-# --- Optional: SuperGlue baseline ---
-# SuperGlue is not on PyPI; clone the repo and download weights manually.
-git clone https://github.com/magicleap/SuperGluePretrainedNetwork superglue
-# Weights are included in the repo under superglue/models/weights/
-#   superglue_outdoor.pth  (use for open-space Gazebo environments)
-#   superglue_indoor.pth
 ```
 
 ---
@@ -131,38 +124,44 @@ ros2 launch robot_description spawn_robot.launch.py
 
 **Collect dataset:**
 ```bash
+# Option A — single launch file (recommended)
+ros2 launch data_collector collect.launch.py
+
+# Option B — start each node manually
 ros2 run data_collector image_saver       # Terminal 1: save images
 ros2 run data_collector gt_pose_saver     # Terminal 2: save ground truth poses
-ros2 run teleop_twist_keyboard teleop_twist_keyboard  # Terminal 3: drive robot
+
+# Terminal 3 (either option): drive the robot
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
 **Run offline VO on collected images:**
 ```bash
 # MambaGlue — pure monocular (scale-corrected ATE evaluation)
 python vo_ros2_ws/scripts/run_offline.py \
-    --data_dir vo_ros2_ws/install/data/images \
+    --data_dir vo_ros2_ws/data/images \
     --sp_weights models/superpoint.pth \
-    --mg_weights models/mambaglue_checkpoint_best.tar \
+    --mg_weights models/checkpoint_best.tar \
     --matcher mambaglue \
     --output results/traj_mambaglue.txt
 
 # SuperGlue baseline
 python vo_ros2_ws/scripts/run_offline.py \
-    --data_dir vo_ros2_ws/install/data/images \
+    --data_dir vo_ros2_ws/data/images \
     --sp_weights models/superpoint.pth \
     --matcher superglue --sg_weights outdoor --sg_repo superglue \
     --output results/traj_superglue.txt
 
 # LightGlue baseline (full-depth, comparable to SuperGlue)
 python vo_ros2_ws/scripts/run_offline.py \
-    --data_dir vo_ros2_ws/install/data/images \
+    --data_dir vo_ros2_ws/data/images \
     --sp_weights models/superpoint.pth \
     --matcher lightglue \
     --output results/traj_lightglue.txt
 
 # LightGlue with adaptive pruning (faster, real-time mode)
 python vo_ros2_ws/scripts/run_offline.py \
-    --data_dir vo_ros2_ws/install/data/images \
+    --data_dir vo_ros2_ws/data/images \
     --sp_weights models/superpoint.pth \
     --matcher lightglue --lg_adaptive \
     --output results/traj_lightglue_adaptive.txt
@@ -171,8 +170,8 @@ python vo_ros2_ws/scripts/run_offline.py \
 python vo_ros2_ws/scripts/run_offline.py \
     --data_dir vo_ros2_ws/data/images \
     --sp_weights models/superpoint.pth \
-    --mg_weights models/mambaglue_checkpoint_best.tar \
-    --gt_file vo_ros2_ws/install/data/groundtruth.txt \
+    --mg_weights models/checkpoint_best.tar \
+    --gt_file vo_ros2_ws/data/groundtruth.txt \
     --output results/predicted_trajectory.txt
 ```
 
@@ -191,14 +190,19 @@ python vo_ros2_ws/scripts/evaluate_ate.py \
 **Visualize trajectory:**
 ```bash
 python vo_ros2_ws/scripts/visualize_trajectory.py \
-    --gt vo_ros2_ws/install/data/groundtruth.txt \
-    --pred results/predicted_trajectory.txt
+    --gt vo_ros2_ws/data/groundtruth.txt \
+    --pred results/predicted_trajectory.txt \
+    --out results/trajectory_plot.png \
+    --correct_scale
 ```
 
 **Benchmark inference (standalone, no ROS):**
 ```bash
+# Run from the repo root — script defaults expect models/ at the root level
 python vo_ros2_ws/scripts/benchmark_inference.py \
-    --data_dir vo_ros2_ws/install/data/images \
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --mg_weights models/checkpoint_best.tar \
     --n_pairs 500 \
     --device cuda
 ```
