@@ -172,7 +172,7 @@ python vo_ros2_ws/scripts/run_offline.py \
     --sp_weights models/superpoint.pth \
     --mg_weights models/checkpoint_best.tar \
     --gt_file vo_ros2_ws/data/groundtruth.txt \
-    --output results/predicted_trajectory.txt
+    --output results/predicted_trajectory_gt.txt
 ```
 
 **Run VO node live (ROS2):**
