@@ -28,6 +28,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src' / 'ssm_vo'))
 
 from ssm_vo.inference import VOInference
+from ssm_vo.matchers import SuperGlueMatcher, LightGlueMatcher
 from ssm_vo.profiler import HardwareProfiler
 
 
@@ -59,11 +60,33 @@ def run(args) -> None:
     pairs = collect_frame_paths(image_dir, args.n_pairs)
     print(f'Loaded {len(pairs)} frame pairs from {image_dir}')
 
+    import torch
+    _device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+
+    if args.matcher == 'superglue':
+        matcher = SuperGlueMatcher(
+            weights=args.sg_weights,
+            device=_device,
+            repo_path=args.sg_repo,
+        )
+        print(f'Matcher: SuperGlue (weights={args.sg_weights})')
+    elif args.matcher == 'lightglue':
+        matcher = LightGlueMatcher(
+            device=_device,
+            adaptive=args.lg_adaptive,
+        )
+        mode = 'adaptive' if args.lg_adaptive else 'full-depth'
+        print(f'Matcher: LightGlue ({mode})')
+    else:
+        matcher = None
+        print(f'Matcher: MambaGlue (weights={args.mg_weights})')
+
     vo = VOInference(
         superpoint_weights=args.sp_weights,
         mambaglue_weights=args.mg_weights,
         camera_matrix=DEFAULT_K,
         device=args.device,
+        matcher=matcher,
     )
 
     # Warmup: run a few pairs so CUDA kernels compile before measuring
@@ -103,14 +126,14 @@ def run(args) -> None:
         else:
             latencies.append(wall_ms)
             sp_times.append(vo.timings.get('superpoint_ms', 0))
-            mg_times.append(vo.timings.get('mambaglue_ms', 0))
+            mg_times.append(vo.timings.get('matcher_ms', 0))
             geo_times.append(vo.timings.get('geometry_ms', 0))
 
         log_rows.append({
             'pair':          i,
             'wall_ms':       round(wall_ms, 3),
             'superpoint_ms': round(vo.timings.get('superpoint_ms', 0), 3),
-            'mambaglue_ms':  round(vo.timings.get('mambaglue_ms', 0), 3),
+            'matcher_ms':    round(vo.timings.get('matcher_ms', 0), 3),
             'geometry_ms':   round(vo.timings.get('geometry_ms', 0), 3),
             'degenerate':    int(T_rel is None),
         })
@@ -151,7 +174,7 @@ def run(args) -> None:
     print('-' * 56)
     print(f'{"Total latency (ms)":<30} {lat["mean"]:>8.1f} {lat["std"]:>8.1f} {lat["p95"]:>8.1f}')
     print(f'{"SuperPoint (ms)":<30} {sp["mean"]:>8.1f}  {sp["std"]:>8.1f}  {sp["p95"]:>8.1f}')
-    print(f'{"MambaGlue (ms)":<30} {mg["mean"]:>8.1f}  {mg["std"]:>8.1f}  {mg["p95"]:>8.1f}')
+    print(f'{"Matcher (ms)":<30} {mg["mean"]:>8.1f}  {mg["std"]:>8.1f}  {mg["p95"]:>8.1f}')
     print(f'{"Geometry (ms)":<30} {geo["mean"]:>8.1f} {geo["std"]:>8.1f} {geo["p95"]:>8.1f}')
     print()
     print(f'{"End-to-end FPS":<30} {fps:>8.1f}')
@@ -189,6 +212,15 @@ def main() -> None:
                         help='PyTorch device string (cuda / cpu)')
     parser.add_argument('--output',     default='results/latency_log.csv',
                         help='Output CSV path')
+    parser.add_argument('--matcher',    default='mambaglue',
+                        choices=['mambaglue', 'superglue', 'lightglue'],
+                        help='Feature matcher backend (default: mambaglue)')
+    parser.add_argument('--sg_weights', default='outdoor',
+                        help='SuperGlue weights: "indoor", "outdoor", or path to .pth')
+    parser.add_argument('--sg_repo',    default='superglue',
+                        help='Path to cloned SuperGluePretrainedNetwork repo')
+    parser.add_argument('--lg_adaptive', action='store_true',
+                        help='Enable LightGlue adaptive depth/width pruning')
     args = parser.parse_args()
     run(args)
 

@@ -37,14 +37,21 @@ MambaVO (CVPR 2025) is the natural target for this project — it is a complete,
               ┌─────────────────┐
               │   SuperPoint    │  Keypoint detection + 256-dim descriptors
               └────────┬────────┘
-                       │  keypoints, descriptors (frame N and N-1)
+                       │  keypoints, scores, descriptors (frame N and N-1)
                        ▼
-          ┌────────────────────────┐
-          │  MambaGlue  (SSM)      │  ← Core SSM component
-          │  Mamba S6 matcher      │    Replaces attention with selective
-          │  ICRA 2025             │    state space model for matching
-          └────────────┬───────────┘
-                       │  matched keypoint pairs + confidence scores
+          ┌────────────────────────────────────────────────┐
+          │  Feature Matcher  (pluggable — select via CLI) │
+          │                                                │
+          │  MambaGlue  (SSM, ICRA 2025)   ← default      │
+          │    Mamba S6 layers, O(N) complexity            │
+          │                                                │
+          │  SuperGlue  (attention, NeurIPS 2020)          │
+          │    GNN + self/cross-attention, O(N²)           │
+          │                                                │
+          │  LightGlue  (attention, ICCV 2023)             │
+          │    Adaptive depth/width attention, O(N²)       │
+          └────────────────────┬───────────────────────────┘
+                               │  matched keypoint pairs + confidence scores
                        ▼
           ┌────────────────────────┐
           │   Pose Estimator       │
@@ -89,7 +96,7 @@ pip install mamba-ssm causal-conv1d --no-build-isolation
 git clone https://github.com/url-kaist/MambaGlue mamba_glue
 cd mamba_glue && pip install -e . && cd ..
 
-# 5. Install remaining Python dependencies
+# 5. Install remaining Python dependencies (includes LightGlue)
 pip install -r vo_ros2_ws/requirements.txt
 
 # 6. Install ROS2 bridge packages
@@ -97,7 +104,7 @@ sudo apt install ros-humble-cv-bridge ros-humble-vision-opencv
 
 # 7. Download pretrained weights into models/
 #    - SuperPoint:  models/superpoint.pth
-#    - MambaGlue:   models/mambaglue_checkpoint_best.tar
+#    - MambaGlue:   models/checkpoint_best.tar
 
 # 8. Build the ROS2 workspace
 source /opt/ros/humble/setup.bash
@@ -117,25 +124,53 @@ ros2 launch robot_description spawn_robot.launch.py
 
 **Collect dataset:**
 ```bash
+# Option A — single launch file (recommended)
+ros2 launch data_collector collect.launch.py
+
+# Option B — start each node manually
 ros2 run data_collector image_saver       # Terminal 1: save images
 ros2 run data_collector gt_pose_saver     # Terminal 2: save ground truth poses
-ros2 run teleop_twist_keyboard teleop_twist_keyboard  # Terminal 3: drive robot
+
+# Terminal 3 (either option): drive the robot
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
 **Run offline VO on collected images:**
 ```bash
-# Pure monocular (scale-corrected ATE evaluation)
-python vo_ros2_ws/scripts/run_offline.py \
-    --data_dir vo_ros2_ws/install/data/images \
-    --sp_weights models/superpoint.pth \
-    --mg_weights models/mambaglue_checkpoint_best.tar \
-    --output results/predicted_trajectory.txt
-
-# GT-scale-assisted mode (restores metric scale from ground truth displacement)
+# MambaGlue — pure monocular (scale-corrected ATE evaluation)
 python vo_ros2_ws/scripts/run_offline.py \
     --data_dir vo_ros2_ws/data/images \
     --sp_weights models/superpoint.pth \
     --mg_weights models/checkpoint_best.tar \
+    --matcher mambaglue \
+    --output results/traj_mambaglue.txt
+
+# SuperGlue baseline
+python vo_ros2_ws/scripts/run_offline.py \
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --matcher superglue --sg_weights outdoor --sg_repo superglue \
+    --output results/traj_superglue.txt
+
+# LightGlue baseline (full-depth, comparable to SuperGlue)
+python vo_ros2_ws/scripts/run_offline.py \
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --matcher lightglue \
+    --output results/traj_lightglue.txt
+
+# LightGlue with adaptive pruning (faster, real-time mode)
+python vo_ros2_ws/scripts/run_offline.py \
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --matcher lightglue --lg_adaptive \
+    --output results/traj_lightglue_adaptive.txt
+
+# GT-scale-assisted mode — add --gt_file to any of the above
+python vo_ros2_ws/scripts/run_offline.py \
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --mg_weights models/mambaglue_checkpoint_best.tar \
     --gt_file vo_ros2_ws/data/groundtruth.txt \
     --output results/predicted_trajectory_gt.txt
 ```
@@ -155,35 +190,77 @@ python vo_ros2_ws/scripts/evaluate_ate.py \
 **Visualize trajectory:**
 ```bash
 python vo_ros2_ws/scripts/visualize_trajectory.py \
-    --gt vo_ros2_ws/install/data/groundtruth.txt \
-    --pred results/predicted_trajectory.txt
+    --gt vo_ros2_ws/data/groundtruth.txt \
+    --pred results/predicted_trajectory.txt \
+    --out results/trajectory_plot.png \
+    --correct_scale
 ```
 
-**Benchmark inference (standalone, no ROS):**
+**Benchmark inference latency (standalone, no ROS):**
 ```bash
+# MambaGlue
 python vo_ros2_ws/scripts/benchmark_inference.py \
-    --data_dir vo_ros2_ws/install/data/images \
-    --n_pairs 500 \
-    --device cuda
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --mg_weights models/checkpoint_best.tar \
+    --matcher mambaglue \
+    --output results/latency_mambaglue.csv \
+    --n_pairs 500 --device cuda
+
+# SuperGlue
+cd vo_ros2_ws && \
+python scripts/benchmark_inference.py \     
+--data_dir data/images \
+--sp_weights ../models/superpoint.pth \
+--matcher superglue --sg_weights outdoor --sg_repo superglue \
+--output ../results/latency_superglue.csv \
+--n_pairs 500 --device cuda
+
+# LightGlue full-depth
+python vo_ros2_ws/scripts/benchmark_inference.py \
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --matcher lightglue \
+    --output results/latency_lightglue.csv \
+    --n_pairs 500 --device cuda
+
+# LightGlue adaptive
+python vo_ros2_ws/scripts/benchmark_inference.py \
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --matcher lightglue --lg_adaptive \
+    --output results/latency_lightglue_adaptive.csv \
+    --n_pairs 500 --device cuda
 ```
 
 ---
 
 ## Results
 
-*To be filled after evaluation runs.*
+### Accuracy (Gazebo, scale-corrected ATE)
+
+| Matcher | ATE RMSE (m) | Dropped frames (%) |
+|---|---|---|
+| MambaGlue (SSM, O(N)) | 3.37 | 17.0 |
+| SuperGlue (attention, O(N²)) | 3.81 | — |
+| LightGlue full-depth (attention, O(N²)) | 3.75 | 18.5 |
+| LightGlue adaptive | 3.58 | 18.2 |
+
+### Latency (NVIDIA GPU, per frame pair)
+
+| Matcher | SuperPoint (ms) | Matcher (ms) | Geometry (ms) | Total (ms) | FPS |
+|---|---|---|---|---|---|
+| MambaGlue | — | — | — | — | — |
+| SuperGlue | — | — | — | — | — |
+| LightGlue full-depth | — | — | — | — | — |
+| LightGlue adaptive | — | — | — | — | — |
+
+### GPU utilisation (MambaGlue run)
 
 | Metric | Value |
 |---|---|
-| Mean inference latency | — ms |
-| End-to-end FPS | — |
-| SuperPoint time | — ms |
-| MambaGlue time | — ms |
-| Geometry time | — ms |
-| GPU utilisation (mean) | —% |
-| Peak VRAM | — MB |
-| ATE RMSE (scale-corrected) | — m |
-| Dropped frames | —% |
+| GPU utilisation (mean) | 7.97% |
+| Peak VRAM | 4190 MB |
 
 ---
 
@@ -205,8 +282,10 @@ python vo_ros2_ws/scripts/benchmark_inference.py \
 ## References
 
 1. **MambaGlue:** Kim et al., *"MambaGlue: Fast and Robust Local Feature Matching with Mamba"*, ICRA 2025. [github.com/url-kaist/MambaGlue](https://github.com/url-kaist/MambaGlue)
-2. **MambaVO:** Wang et al., *"MambaVO: Deep Visual Odometry Based on Sequential Matching Refinement and Training Smoothing"*, CVPR 2025. [arXiv:2412.20082](https://arxiv.org/abs/2412.20082)
-3. **Mamba:** Gu & Dao, *"Mamba: Linear-Time Sequence Modeling with Selective State Spaces"*, 2023. [github.com/state-spaces/mamba](https://github.com/state-spaces/mamba)
-4. **SuperPoint:** DeTone et al., *"SuperPoint: Self-Supervised Interest Point Detection and Description"*, CVPR Workshops 2018.
-5. **evo:** Grupp, *"evo: Python package for the evaluation of odometry and SLAM"*. [github.com/MichaelGrupp/evo](https://github.com/MichaelGrupp/evo)
-6. **Awesome Learning-based VO/VIO:** [github.com/KwanWaiPang/Awesome-Learning-based-VO-VIO](https://github.com/KwanWaiPang/Awesome-Learning-based-VO-VIO)
+2. **SuperGlue:** Sarlin et al., *"SuperGlue: Learning Feature Matching with Graph Neural Networks"*, CVPR 2020. [github.com/magicleap/SuperGluePretrainedNetwork](https://github.com/magicleap/SuperGluePretrainedNetwork)
+3. **LightGlue:** Lindenberger et al., *"LightGlue: Local Feature Matching at Light Speed"*, ICCV 2023. [github.com/cvg/LightGlue](https://github.com/cvg/LightGlue)
+4. **MambaVO:** Wang et al., *"MambaVO: Deep Visual Odometry Based on Sequential Matching Refinement and Training Smoothing"*, CVPR 2025. [arXiv:2412.20082](https://arxiv.org/abs/2412.20082)
+5. **Mamba:** Gu & Dao, *"Mamba: Linear-Time Sequence Modeling with Selective State Spaces"*, 2023. [github.com/state-spaces/mamba](https://github.com/state-spaces/mamba)
+6. **SuperPoint:** DeTone et al., *"SuperPoint: Self-Supervised Interest Point Detection and Description"*, CVPR Workshops 2018.
+7. **evo:** Grupp, *"evo: Python package for the evaluation of odometry and SLAM"*. [github.com/MichaelGrupp/evo](https://github.com/MichaelGrupp/evo)
+8. **Awesome Learning-based VO/VIO:** [github.com/KwanWaiPang/Awesome-Learning-based-VO-VIO](https://github.com/KwanWaiPang/Awesome-Learning-based-VO-VIO)

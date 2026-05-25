@@ -22,5 +22,12 @@ matplotlib>=3.7.0,<3.9
 # GPU profiling
 nvidia-ml-py3>=7.352.0
 
+# Baseline matchers (optional — only needed for --matcher=lightglue / --matcher=superglue)
+# LightGlue: not on PyPI — install from GitHub:
+# pip install git+https://github.com/cvg/LightGlue.git
+# SuperGlue: clone the Magic Leap repo manually (not on PyPI)
+# git clone https://github.com/magicleap/SuperGluePretrainedNetwork superglue
+# Weights (superglue_outdoor.pth / superglue_indoor.pth) go in superglue/models/weights/
+
 # ROS2 bridge (installed via apt, not pip)
 # sudo apt install ros-humble-cv-bridge ros-humble-vision-opencv
