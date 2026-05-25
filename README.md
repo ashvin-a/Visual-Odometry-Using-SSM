@@ -217,10 +217,10 @@ python vo_ros2_ws/scripts/benchmark_inference.py \
 
 | Matcher | ATE RMSE (m) | Dropped frames (%) |
 |---|---|---|
-| MambaGlue (SSM, O(N)) | — | — |
-| SuperGlue (attention, O(N²)) | — | — |
-| LightGlue full-depth (attention, O(N²)) | — | — |
-| LightGlue adaptive | — | — |
+| MambaGlue (SSM, O(N)) | 3.37 | 17.0 |
+| SuperGlue (attention, O(N²)) | 3.81 | — |
+| LightGlue full-depth (attention, O(N²)) | 3.75 | 18.5 |
+| LightGlue adaptive | 3.58 | 18.2 |
 
 ### Latency (NVIDIA GPU, per frame pair)
 
@@ -235,8 +235,8 @@ python vo_ros2_ws/scripts/benchmark_inference.py \
 
 | Metric | Value |
 |---|---|
-| GPU utilisation (mean) | —% |
-| Peak VRAM | — MB |
+| GPU utilisation (mean) | 7.97% |
+| Peak VRAM | 4190 MB |
 
 ---
 
