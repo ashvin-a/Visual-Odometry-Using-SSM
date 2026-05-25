@@ -196,22 +196,45 @@ python vo_ros2_ws/scripts/visualize_trajectory.py \
     --correct_scale
 ```
 
-**Benchmark inference (standalone, no ROS):**
+**Benchmark inference latency (standalone, no ROS):**
 ```bash
-# Run from the repo root — script defaults expect models/ at the root level
+# MambaGlue
 python vo_ros2_ws/scripts/benchmark_inference.py \
     --data_dir vo_ros2_ws/data/images \
     --sp_weights models/superpoint.pth \
-    --mg_weights models/checkpoint_best.tar \
-    --n_pairs 500 \
-    --device cuda
+    --mg_weights models/mambaglue_checkpoint_best.tar \
+    --matcher mambaglue \
+    --output results/latency_mambaglue.csv \
+    --n_pairs 500 --device cuda
+
+# SuperGlue
+python vo_ros2_ws/scripts/benchmark_inference.py \
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --matcher superglue --sg_weights outdoor --sg_repo superglue \
+    --output results/latency_superglue.csv \
+    --n_pairs 500 --device cuda
+
+# LightGlue full-depth
+python vo_ros2_ws/scripts/benchmark_inference.py \
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --matcher lightglue \
+    --output results/latency_lightglue.csv \
+    --n_pairs 500 --device cuda
+
+# LightGlue adaptive
+python vo_ros2_ws/scripts/benchmark_inference.py \
+    --data_dir vo_ros2_ws/data/images \
+    --sp_weights models/superpoint.pth \
+    --matcher lightglue --lg_adaptive \
+    --output results/latency_lightglue_adaptive.csv \
+    --n_pairs 500 --device cuda
 ```
 
 ---
 
 ## Results
-
-*To be filled after evaluation runs.*
 
 ### Accuracy (Gazebo, scale-corrected ATE)
 
